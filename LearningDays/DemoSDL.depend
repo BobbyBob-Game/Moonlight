@@ -1,0 +1,14 @@
+# depslib dependency file v1.0
+1738906157 source:d:\bach\experimental tech\codeblock\olympictinhockhongchuyen\demosdl\main.cpp
+	<iostream>
+	<SDL.h>
+
+1739032009 source:d:\bach\experimental tech\codeblocks\codeblock\olympictinhockhongchuyen\demosdl\main.cpp
+	<iostream>
+	<SDL.h>
+	<SDL_image.h>
+	<string>
+	"preDef.h"
+
+1739032009 d:\bach\experimental tech\codeblocks\codeblock\olympictinhockhongchuyen\demosdl\predef.h
+
