@@ -1,0 +1,21 @@
+Platform: Tiled + SDL2:
+1. Make a platform first: Draw a rectangle
+//NOTE: if the bmp format is already in transparent format -> SDL can hadle that 
+
+if not: 
+BEST to SDL_SetColorKey after setting SDL_surface
+use SDL_SetColorKey(surface, SDL_MapRGB(surface->format, background color)); //by first making the file have color 255,0,255 -> rare color act like green screen
+
+to ep37
++ ep47, 48,49,50,51
+
+PRE: make project structure: DONE
+Docs
+Assets
+screeninclude
+lib
+bin
+thirdparty (SDL2,...)
+
+Resource manager:
+singleton class
