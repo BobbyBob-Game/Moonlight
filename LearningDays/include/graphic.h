@@ -4,6 +4,7 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include "preDef.h"
+#include "entity.h"
 //This is for window and renderer creation
 /*
 Use class: because has initializers
@@ -105,6 +106,120 @@ public:
     }
 
 };
+
+class Dot
+{
+    public:
+    int DOT_WIDTH = 20;
+    int DOT_HEIGHT = 20;
+
+
+    //Velocity:
+    static const int DOT_VEL = 10;
+
+    //Initialize the variables:
+    Dot();
+
+    //SetEntity for Dot:
+    void setEntityAttr(const string& name, long long health, const string& power){
+        player.setName(name);
+        player.setHealth(health);
+        player.setPower(power);
+    }
+    
+
+    //Take key presses and adjust the dot's velocity
+    void handleEvent(SDL_Event& event){
+        if(event.type == SDL_KEYDOWN && event.key.repeat == 0){
+            //Adjust the velocity
+            switch(event.key.keysym.sym){
+                case SDLK_UP: mVelY -= DOT_VEL; std::cout<<"Up was pressed\n";break;
+                case SDLK_DOWN: mVelY += DOT_VEL; std::cout<<"Down was pressed\n";break;
+                case SDLK_LEFT: mVelX -= DOT_VEL; std::cout<<"Left was pressed\n";break;
+                case SDLK_RIGHT: mVelX += DOT_VEL; std::cout<<"Right was pressed\n";break;
+            }
+        }
+        //If a key was released
+        else if(event.type == SDL_KEYUP && event.key.repeat == 0){
+            //Adjust the velocity again to negate the previous velocity
+            switch(event.key.keysym.sym){
+                case SDLK_UP: mVelY += DOT_VEL; break;
+                case SDLK_DOWN: mVelY -= DOT_VEL; break;
+                case SDLK_LEFT: mVelX += DOT_VEL; break;
+                case SDLK_RIGHT: mVelX -= DOT_VEL; break;
+            }
+        }
+    }
+
+    //Move the dot:
+    void move(){
+        mPosX += mVelX; //left and right
+        //if out of screen
+        if((mPosX < 0) || mPosX + DOT_WIDTH > SCREEN_WIDTH){
+            //Move back
+            mPosX -= mVelX;
+        }
+
+        mPosY += mVelY; //move up and down
+        if((mPosY < 0) || mPosY + DOT_HEIGHT > SCREEN_HEIGHT){
+            //Move back
+            mPosY -= mVelY;
+        }
+        
+    }
+
+    //Shows on the screen
+    void render(SDL_Texture* texture, SDL_Renderer* renderer) { 
+        SDL_Rect renderQuad = { mPosX, mPosY, DOT_WIDTH, DOT_HEIGHT };  // Position and size
+        if (SDL_RenderCopy(renderer, texture, NULL, &renderQuad) != 0) {
+            std::cerr << "Failed to render texture: " << SDL_GetError() << std::endl;
+        }
+    }
+    
+    void isColliding(const SDL_Rect& wall){
+        SDL_Rect renderQuad = { mPosX, mPosY, DOT_WIDTH, DOT_HEIGHT };
+        if (SDL_HasIntersection(&wall, &renderQuad)) {
+            // Undo movement
+            mPosX -= mVelX;
+            mPosY -= mVelY;
+            //std::cout<<"Hitting a wall\n"<<std::endl;
+
+            //now make it lose health if collision happens, if health == 0, says it dies
+            player.setHealth(player.getHealth() - 10);
+            if(player.getHealth() <= 0){
+                cout<<player.getName()<<" has died\n";
+            }
+            else{
+                cout<<player.getName()<<" took damage! Health remaining: "<<player.getHealth()<<"\n";
+            }
+        }
+    }
+
+    private:
+    //X,Y offsets of the dot
+    int mPosX, mPosY;
+    //Velocity of the dot
+    int mVelX, mVelY;
+
+    Dot_Entity player;
+};
+
+Dot::Dot(){
+    mPosX = 0;
+    mPosY = 0;
+
+    mVelX = 0;
+    mVelY = 0;
+
+    player.setName("Just a Dot");
+    player.setHealth(1000);
+    player.setPower("Basic Attack");
+}
+
+
+
+
+
 
 
 #endif // GRAPHIC_H_INCLUDED
