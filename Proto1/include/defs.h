@@ -5,7 +5,7 @@
 #define SCREEN_HEIGHT 720
 
 #define TILE_SIZE 64
-#define GRAVITY 10
 
+#define MAX_NAME_LENGTH 100
 
 #endif

@@ -11,8 +11,12 @@ enum Direction {
 Direction characterState = IDLE_RIGHT;
 
 Game::Game() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << "\n";
+        return;
+    }
+    if(TTF_Init() == -1){
+        std::cerr << "True type font could not initialized! Error: " << TTF_GetError() << "\n";
         return;
     }
 
@@ -26,10 +30,10 @@ Game::Game() {
     player.setImage("assets/PLAYER/player.png",renderer);
     player.setDest(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100, 63,63);
     
-    idle_right = player.createCycle(2,64,64,10,10);
-    run_right = player.createCycle(1,64,64,16,10);
-    idle_left = player.createCycle(6,64,64,10,10);
-    run_left = player.createCycle(5,64,64,16,10);
+    idle_right = player.createCycle(2,63,63,10,10);
+    run_right = player.createCycle(1,63,63,16,10);
+    idle_left = player.createCycle(6,63,63,10,10);
+    run_left = player.createCycle(5,63,63,16,10);
     loadMap("assets/MAP/Ground.level");
 
     mapX = mapY = 0;
@@ -40,41 +44,48 @@ Game::Game() {
 Game::~Game(){
     SDL_DestroyWindow(window);
     SDL_DestroyRenderer(renderer);
+    TTF_Quit();
     IMG_Quit();
     SDL_Quit();
 }
 
 void Game::loop() {
-    static int lastTime = 0;
-    while(running){
+    const int FRAME_DELAY = 1000 / 60; // Limit to 60 FPS
+    Uint32 frameStart;
+    int frameTime;
 
-        lastFrame = SDL_GetTicks();
-        static int lastTime;
-        if(lastFrame >= (lastTime+1000)){
-            lastTime = lastFrame;
-            frameCount = 0;
+    while (running) {
+        frameStart = SDL_GetTicks();
+
+        render(); // Draw everything
+        input();  // Handle input
+        update(); // Update game state
+
+        // Frame rate control
+        frameTime = SDL_GetTicks() - frameStart;
+        if (frameTime < FRAME_DELAY) {
+            SDL_Delay(FRAME_DELAY - frameTime);
         }
-
-        render();
-        input();
-        update();
-
     }
 }
+
 
 void Game::render() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    // Draw Background directly
     SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}; 
     SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
 
-    drawMap();  // Draws the level
+    drawMap();
     draw(player);
+
+    // Move text rendering last, so nothing draws over it
+    drawLetter("Testing", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 255, 255, 255, 28);
 
     SDL_RenderPresent(renderer);
 }
+
 
 
 
@@ -97,60 +108,109 @@ void Game::input() { //TODO: make the player jump
             running = false;
         }
         // Handle key press (only change state once)
-        if(event.type == SDL_KEYDOWN && event.key.repeat == 0) {
-            if(event.key.keysym.sym == SDLK_RIGHT && characterState != RUNNING_RIGHT){
+        if(event.type == SDL_KEYDOWN) {
+            if(event.key.keysym.sym == SDLK_RIGHT && characterState != RUNNING_RIGHT && event.key.repeat == 0){
                 left = 0;
                 right = 1;
                 player.setCurrentAnimation(run_right);
                 characterState = RUNNING_RIGHT;
             }
-            if(event.key.keysym.sym == SDLK_LEFT && characterState != RUNNING_LEFT){
+            if(event.key.keysym.sym == SDLK_LEFT && characterState != RUNNING_LEFT && event.key.repeat == 0){
                 left = 1;
                 right = 0;
 
                 player.setCurrentAnimation(run_left);
                 characterState = RUNNING_LEFT;
             }
+            if(event.key.keysym.sym == SDLK_UP && !isJumping && !fall){
+                jumpBuffer = JUMP_BUFFER_FRAME;
+            }
+
         }
         // Handle key release (only change state once)
         if(event.type == SDL_KEYUP) {
             if(event.key.keysym.sym == SDLK_RIGHT && characterState == RUNNING_RIGHT){
-                right = 0;
+                right = 0; // Stop movement
+                left = 0;
                 player.setCurrentAnimation(idle_right);
                 characterState = IDLE_RIGHT;
             }
             if(event.key.keysym.sym == SDLK_LEFT && characterState == RUNNING_LEFT){
-                left = 0;
+                left = 0; // Stop movement
+                right = 0;
                 player.setCurrentAnimation(idle_left);
                 characterState = IDLE_LEFT;
             }
-        }
+        }        
     }
 }
 
 
-void Game::update(){
-    //make the player decelarate in water:
-    if(left){
-        player.setDest(player.getDX() - (runningSpeedNormal), player.getDY());
+void Game::update() {
+
+    if(isJumping || fall){
+        gravity_timer ++;
+        float gravityEffect = (gravity_timer < 5) ? (GRAVITY*0.5f) : GRAVITY;
+        UpVelocity += gravityEffect;
+        if(UpVelocity > MAX_FALL_SPEED){
+            UpVelocity = MAX_FALL_SPEED;
+        }
     }
-    if(right){
-        player.setDest(player.getDX() + (runningSpeedNormal), player.getDY());
+    if(!isJumping && fall){
+        flyingTimer = (flyingTimer > 0) ? flyingTimer - 1 : 0;
     }
-    fall = 1, water = 0; 
-    for(int i = 0; i < map.size(); i++){
-        if(collision(player, map[i])){
-            if(map[i].getSolid()){
-                fall = 0;
+
+    if(jumpBuffer > 0) jumpBuffer--; //decrease jump buffer timer
+
+    if(jumpBuffer > 0 && (flyingTimer > 0 || !fall)){
+        isJumping = true;
+        UpVelocity = jumpForce;
+        gravity_timer = 0;
+        jumpBuffer = 0;
+        jumpHoldTimer = JUMP_HOLD_TIMER;
+    }
+    if(jumpHoldTimer > 0 && SDL_GetKeyboardState(NULL)[SDL_SCANCODE_UP]){
+        UpVelocity += JUMP_HOLD_FORCE;
+        jumpHoldTimer--;
+    }
+
+    player.setDest(player.getDX(), player.getDY() + UpVelocity);
+    // Apply horizontal movement
+    if(left) {
+        player.setDest(player.getDX() - runningSpeedNormal, player.getDY());
+    }
+    else if(left && isJumping){
+        player.setDest(player.getDX() - runningSpeedNormal, player.getDY() + UpVelocity);
+    }
+    if(right) {
+        player.setDest(player.getDX() + runningSpeedNormal, player.getDY());
+    }
+    else if(right && isJumping){
+        player.setDest(player.getDX() + runningSpeedNormal, player.getDY() + UpVelocity);
+    }
+    
+    // Collision handling
+    fall = true; 
+    for (int i = 0; i < map.size(); i++) {
+        if (collision(player, map[i]) && map[i].getSolid()) {
+            // If moving down (falling), align player on top of platform
+            if (UpVelocity > 0) {
+                isJumping = false;
+                fall = false;
+                UpVelocity = 0;
+
+                // Align player's feet exactly on top of the platform
+                player.setDest(player.getDX(), map[i].getDY() - player.getDH());
+                flyingTimer = FLYING_TIME_FRAME;
             }
-            else{
-                water = 1;
+            // If moving up (jumping) and hitting ceiling, stop upward movement
+            else if (UpVelocity < 0) {
+                UpVelocity = 0;
+                player.setDest(player.getDX(), map[i].getDY() + map[i].getDH());
             }
         }
     }
-    if(fall){
-        player.setDest(player.getDX(), player.getDY() + GRAVITY);
-    }
+
     if(water && left){
         player.setDest(player.getDX() + (runningSpeedNormal)- (runningSpeedWater), player.getDY());
     }
@@ -159,7 +219,6 @@ void Game::update(){
     }
     //Need to know the position of player:
     cout<<player.getDX()<<":" <<player.getDY()<<"\n";
-    
 
     player.updateAnimation();
 }
@@ -216,4 +275,47 @@ bool Game::collision(Object a, Object b){
     else{
         return false;
     }
+}
+
+void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int size) {
+
+    TTF_Font *font = TTF_OpenFont("assets/FONTS/8bitOperatorPlus8-Regular.ttf", size);
+    if (font == nullptr) {
+        std::cerr << "Error: Font failed to load! " << TTF_GetError() << std::endl;
+        return;
+    }
+
+    SDL_Color color;
+    color.r = r;
+    color.g = g;
+    color.b = b;
+    color.a = 255;
+
+    SDL_Surface *surfText = TTF_RenderText_Solid(font, msg, color);
+    if (surfText == nullptr) {
+        std::cerr << "Error: Failed to create text surface! " << TTF_GetError() << std::endl;
+        TTF_CloseFont(font);
+        return;
+    }
+    std::cout << "Text surface created successfully!" << std::endl;
+
+    SDL_Texture* textureText = SDL_CreateTextureFromSurface(renderer, surfText);
+    if (textureText == nullptr) {
+        std::cerr << "Error: Failed to create texture from text! " << SDL_GetError() << std::endl;
+        SDL_FreeSurface(surfText);
+        TTF_CloseFont(font);
+        return;
+    }
+
+    SDL_Rect textholder;
+    textholder.x = x;
+    textholder.y = y;
+    textholder.w = surfText->w;
+    textholder.h = surfText->h;
+
+    SDL_RenderCopy(renderer, textureText, NULL, &textholder);
+
+    SDL_FreeSurface(surfText);
+    SDL_DestroyTexture(textureText);
+    TTF_CloseFont(font);
 }
