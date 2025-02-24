@@ -1,6 +1,6 @@
 #include "entity.h"
 
-int Entity::createCycle(int r, int w, int h, int amount, int speed){ //problem
+int Entity::createCycle(int r, int w, int h, int amount, int speed){
     cycle temp;
     temp.row = r-1;
     temp.w = w;
@@ -9,7 +9,7 @@ int Entity::createCycle(int r, int w, int h, int amount, int speed){ //problem
     temp.speed = speed;
     temp.tick = 0;
     animations.push_back(temp);
-    return animations.size() - 1;
+    return animations.size() - 1; //return the index of the newly added cycle
 }
 
 void Entity::updateAnimation(){

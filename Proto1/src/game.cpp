@@ -8,7 +8,13 @@ enum Direction {
     RUNNING_LEFT
 };
 
+enum GameState {
+    STATE_MENU,
+    STATE_GAME
+};
+
 Direction characterState = IDLE_RIGHT;
+GameState gameState;
 
 Game::Game() {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
@@ -22,6 +28,7 @@ Game::Game() {
 
     window = SDL_CreateWindow("Moonlight", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    font = TTF_OpenFont("assets/FONTS/8bitOperatorPlus8-Regular.ttf", 28);
     running = true;
     count = 0;
 
@@ -34,6 +41,13 @@ Game::Game() {
     run_right = player.createCycle(1,63,63,16,10);
     idle_left = player.createCycle(6,63,63,10,10);
     run_left = player.createCycle(5,63,63,16,10);
+
+    start_button = menu.createWidget(SCREEN_WIDTH/2 - 140 , SCREEN_HEIGHT/2 - 64, 288, 64, "Start a new game");
+    exit_button = menu.createWidget(SCREEN_WIDTH/2 - 140, SCREEN_HEIGHT/2, 288, 64, "Exit ...");
+
+    menu.setButtonTexture(start_button, "assets/BUTTONS/buttons1.png", renderer);
+    menu.setButtonTexture(exit_button, "assets/BUTTONS/buttons1.png", renderer);
+
     loadMap("assets/MAP/Ground.level");
 
     mapX = mapY = 0;
@@ -77,29 +91,36 @@ void Game::render() {
     SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}; 
     SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
 
-    drawMap();
-    draw(player);
-
+    if(gameState == STATE_MENU){
+        menu.button_render(renderer, font);
+        drawLetter("Moonlight", SCREEN_WIDTH/2 - 100, SCREEN_HEIGHT/4, 255, 255, 255, 40);
+    }
+    else if(gameState == STATE_GAME){
+        drawMap();
+        draw(player);
+        menu.button_render(renderer, font);
+    }
+    
     // Move text rendering last, so nothing draws over it
-    drawLetter("Testing", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 255, 255, 255, 28);
+    //drawLetter("Start a new game", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 255, 255, 255, 28);
 
     SDL_RenderPresent(renderer);
 }
 
 
 
-
-void Game::draw(Object o){
+void Game::draw(Object o) {
     SDL_Rect dest = o.getDest();
     SDL_Rect src = o.getSource();
+
     if (!o.getTex()) {
-        std::cerr << "Error: Object texture is NULL\n";
+        std::cerr << "Error: Object texture is NULL for " <<"\n";
         return;
     }
 
     SDL_RenderCopyEx(renderer, o.getTex(), &src, &dest, 0, NULL, SDL_FLIP_NONE);
-    
 }
+
 
 void Game::input() { //TODO: make the player jump
     SDL_Event event;
@@ -107,39 +128,48 @@ void Game::input() { //TODO: make the player jump
         if(event.type == SDL_QUIT){
             running = false;
         }
-        // Handle key press (only change state once)
-        if(event.type == SDL_KEYDOWN) {
-            if(event.key.keysym.sym == SDLK_RIGHT && characterState != RUNNING_RIGHT && event.key.repeat == 0){
-                left = 0;
-                right = 1;
-                player.setCurrentAnimation(run_right);
-                characterState = RUNNING_RIGHT;
-            }
-            if(event.key.keysym.sym == SDLK_LEFT && characterState != RUNNING_LEFT && event.key.repeat == 0){
-                left = 1;
-                right = 0;
-
-                player.setCurrentAnimation(run_left);
-                characterState = RUNNING_LEFT;
-            }
-            if(event.key.keysym.sym == SDLK_UP && !isJumping && !fall){
-                jumpBuffer = JUMP_BUFFER_FRAME;
-            }
-
+        if(gameState == STATE_MENU){
+            menu.updateWidget(event);
+            
         }
-        // Handle key release (only change state once)
-        if(event.type == SDL_KEYUP) {
-            if(event.key.keysym.sym == SDLK_RIGHT && characterState == RUNNING_RIGHT){
-                right = 0; // Stop movement
-                left = 0;
-                player.setCurrentAnimation(idle_right);
-                characterState = IDLE_RIGHT;
+        
+
+        else if(gameState == STATE_GAME){
+                
+            // Handle key press (only change state once)
+            if(event.type == SDL_KEYDOWN) {
+                if(event.key.keysym.sym == SDLK_RIGHT && characterState != RUNNING_RIGHT && event.key.repeat == 0){
+                    left = 0;
+                    right = 1;
+                    player.setCurrentAnimation(run_right);
+                    characterState = RUNNING_RIGHT;
+                }
+                if(event.key.keysym.sym == SDLK_LEFT && characterState != RUNNING_LEFT && event.key.repeat == 0){
+                    left = 1;
+                    right = 0;
+
+                    player.setCurrentAnimation(run_left);
+                    characterState = RUNNING_LEFT;
+                }
+                if(event.key.keysym.sym == SDLK_UP && !isJumping && !fall){
+                    jumpBuffer = JUMP_BUFFER_FRAME;
+                }
+
             }
-            if(event.key.keysym.sym == SDLK_LEFT && characterState == RUNNING_LEFT){
-                left = 0; // Stop movement
-                right = 0;
-                player.setCurrentAnimation(idle_left);
-                characterState = IDLE_LEFT;
+            // Handle key release (only change state once)
+            if(event.type == SDL_KEYUP) {
+                if(event.key.keysym.sym == SDLK_RIGHT && characterState == RUNNING_RIGHT){
+                    right = 0; // Stop movement
+                    left = 0;
+                    player.setCurrentAnimation(idle_right);
+                    characterState = IDLE_RIGHT;
+                }
+                if(event.key.keysym.sym == SDLK_LEFT && characterState == RUNNING_LEFT){
+                    left = 0; // Stop movement
+                    right = 0;
+                    player.setCurrentAnimation(idle_left);
+                    characterState = IDLE_LEFT;
+                }
             }
         }        
     }
@@ -147,80 +177,83 @@ void Game::input() { //TODO: make the player jump
 
 
 void Game::update() {
-
-    if(isJumping || fall){
-        gravity_timer ++;
-        float gravityEffect = (gravity_timer < 5) ? (GRAVITY*0.5f) : GRAVITY;
-        UpVelocity += gravityEffect;
-        if(UpVelocity > MAX_FALL_SPEED){
-            UpVelocity = MAX_FALL_SPEED;
-        }
-    }
-    if(!isJumping && fall){
-        flyingTimer = (flyingTimer > 0) ? flyingTimer - 1 : 0;
-    }
-
-    if(jumpBuffer > 0) jumpBuffer--; //decrease jump buffer timer
-
-    if(jumpBuffer > 0 && (flyingTimer > 0 || !fall)){
-        isJumping = true;
-        UpVelocity = jumpForce;
-        gravity_timer = 0;
-        jumpBuffer = 0;
-        jumpHoldTimer = JUMP_HOLD_TIMER;
-    }
-    if(jumpHoldTimer > 0 && SDL_GetKeyboardState(NULL)[SDL_SCANCODE_UP]){
-        UpVelocity += JUMP_HOLD_FORCE;
-        jumpHoldTimer--;
-    }
-
-    player.setDest(player.getDX(), player.getDY() + UpVelocity);
-    // Apply horizontal movement
-    if(left) {
-        player.setDest(player.getDX() - runningSpeedNormal, player.getDY());
-    }
-    else if(left && isJumping){
-        player.setDest(player.getDX() - runningSpeedNormal, player.getDY() + UpVelocity);
-    }
-    if(right) {
-        player.setDest(player.getDX() + runningSpeedNormal, player.getDY());
-    }
-    else if(right && isJumping){
-        player.setDest(player.getDX() + runningSpeedNormal, player.getDY() + UpVelocity);
-    }
-    
-    // Collision handling
-    fall = true; 
-    for (int i = 0; i < map.size(); i++) {
-        if (collision(player, map[i]) && map[i].getSolid()) {
-            // If moving down (falling), align player on top of platform
-            if (UpVelocity > 0) {
-                isJumping = false;
-                fall = false;
-                UpVelocity = 0;
-
-                // Align player's feet exactly on top of the platform
-                player.setDest(player.getDX(), map[i].getDY() - player.getDH());
-                flyingTimer = FLYING_TIME_FRAME;
-            }
-            // If moving up (jumping) and hitting ceiling, stop upward movement
-            else if (UpVelocity < 0) {
-                UpVelocity = 0;
-                player.setDest(player.getDX(), map[i].getDY() + map[i].getDH());
+    if(gameState == STATE_GAME){
+        if(isJumping || fall){
+            gravity_timer ++;
+            float gravityEffect = (gravity_timer < 5) ? (GRAVITY*0.5f) : GRAVITY;
+            UpVelocity += gravityEffect;
+            if(UpVelocity > MAX_FALL_SPEED){
+                UpVelocity = MAX_FALL_SPEED;
             }
         }
-    }
+        if(!isJumping && fall){
+            flyingTimer = (flyingTimer > 0) ? flyingTimer - 1 : 0;
+        }
 
-    if(water && left){
-        player.setDest(player.getDX() + (runningSpeedNormal)- (runningSpeedWater), player.getDY());
-    }
-    if(water && right){
-        player.setDest(player.getDX() - (runningSpeedNormal) + (runningSpeedWater), player.getDY());
-    }
-    //Need to know the position of player:
-    cout<<player.getDX()<<":" <<player.getDY()<<"\n";
+        if(jumpBuffer > 0) jumpBuffer--; //decrease jump buffer timer
 
-    player.updateAnimation();
+        if(jumpBuffer > 0 && (flyingTimer > 0 || !fall)){
+            isJumping = true;
+            UpVelocity = jumpForce;
+            gravity_timer = 0;
+            jumpBuffer = 0;
+            jumpHoldTimer = JUMP_HOLD_TIMER;
+        }
+        if(jumpHoldTimer > 0 && SDL_GetKeyboardState(NULL)[SDL_SCANCODE_UP]){
+            UpVelocity += JUMP_HOLD_FORCE;
+            jumpHoldTimer--;
+        }
+
+        player.setDest(player.getDX(), player.getDY() + UpVelocity);
+        // Apply horizontal movement
+        if(left) {
+            player.setDest(player.getDX() - runningSpeedNormal, player.getDY());
+        }
+        else if(left && isJumping){
+            player.setDest(player.getDX() - runningSpeedNormal, player.getDY() + UpVelocity);
+        }
+        if(right) {
+            player.setDest(player.getDX() + runningSpeedNormal, player.getDY());
+        }
+        else if(right && isJumping){
+            player.setDest(player.getDX() + runningSpeedNormal, player.getDY() + UpVelocity);
+        }
+        
+        // Collision handling
+        fall = true; 
+        for (int i = 0; i < map.size(); i++) {
+            if (collision(player, map[i]) && map[i].getSolid()) {
+                // If moving down (falling), align player on top of platform
+                if (UpVelocity > 0) {
+                    isJumping = false;
+                    fall = false;
+                    UpVelocity = 0;
+
+                    // Align player's feet exactly on top of the platform
+                    player.setDest(player.getDX(), map[i].getDY() - player.getDH());
+                    flyingTimer = FLYING_TIME_FRAME;
+                }
+                // If moving up (jumping) and hitting ceiling, stop upward movement
+                else if (UpVelocity < 0) {
+                    UpVelocity = 0;
+                    player.setDest(player.getDX(), map[i].getDY() + map[i].getDH());
+                }
+            }
+        }
+
+        if(water && left){
+            player.setDest(player.getDX() + (runningSpeedNormal)- (runningSpeedWater), player.getDY());
+        }
+        if(water && right){
+            player.setDest(player.getDX() - (runningSpeedNormal) + (runningSpeedWater), player.getDY());
+        }
+        //Need to know the position of player:
+        //cout<<player.getDX()<<":" <<player.getDY()<<"\n";
+
+        menu.setDest(0, 0, 128, 64);
+
+        player.updateAnimation();
+    }
 }
 
 void Game::loadMap(const char *filename){
@@ -279,7 +312,7 @@ bool Game::collision(Object a, Object b){
 
 void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int size) {
 
-    TTF_Font *font = TTF_OpenFont("assets/FONTS/8bitOperatorPlus8-Regular.ttf", size);
+    TTF_Font* font = TTF_OpenFont("assets/FONTS/8bitOperatorPlus8-Regular.ttf", size);
     if (font == nullptr) {
         std::cerr << "Error: Font failed to load! " << TTF_GetError() << std::endl;
         return;
@@ -297,7 +330,6 @@ void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int si
         TTF_CloseFont(font);
         return;
     }
-    std::cout << "Text surface created successfully!" << std::endl;
 
     SDL_Texture* textureText = SDL_CreateTextureFromSurface(renderer, surfText);
     if (textureText == nullptr) {

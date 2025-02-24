@@ -1,24 +1,31 @@
 #ifndef WIDGET_H_INCLUDED
 #define WIDGET_H_INCLUDED
 #include "defs.h"
+#include "object.h"
+#include <SDL2/SDL_ttf.h>
 #include <string>
-//widget is a double-linked-list -> can go back and forth 
-class Widget {
+#include <vector>
+#include <iostream>
+using namespace std;
+
+class Widget : public Object { 
     private:
-    std::string name; //identify
-    int x, y; //coordinates
-    char label[MAX_NAME_LENGTH]; //text displaying
-    Widget* prev;
-    Widget* next;
+    int curWid;
+    int begin = 0;
+
+    struct button {
+        SDL_Rect rect;
+        std::string label; //text displaying   
+        Object image; 
+    };
+    vector<button> buttons;
 
     public:
-    //Constructor:
-    Widget(std::string a_name){
-        name = a_name;
-        prev = next = nullptr;
-    } //each time a new 'button' is added, it's get inserted at the end of the linked list
-    void addButton(Widget button); //add button to the list of buttons
-
+    Widget() : curWid(-1) {}
+    int createWidget(int x, int y, int w, int h, std::string label);
+    void updateWidget(SDL_Event& event);
+    void button_render(SDL_Renderer* renderer, TTF_Font* font);
+    void setButtonTexture(int index, const std::string& filename, SDL_Renderer* renderer);
 };
 
 

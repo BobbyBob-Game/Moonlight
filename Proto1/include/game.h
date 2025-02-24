@@ -30,7 +30,8 @@ class Game {
     SDL_Renderer *renderer;
     SDL_Window* window;
     bool running;
-    Widget *activeWidget;
+    TTF_Font *font;
+    Widget menu;
 
     int count;
     int frameCount, timerFPS, lastFrame;
@@ -53,6 +54,10 @@ class Game {
     const int GRAVITY = 9; //pixel based 
     int gravity_timer = 0;
     int idle_left, idle_right, run_left, run_right;
+
+    int start_button;
+    int exit_button;
+
     const int JUMP_BUFFER_FRAME = 6;
     const int FLYING_TIME_FRAME = 8;
     const int MAX_FALL_SPEED = 7;
