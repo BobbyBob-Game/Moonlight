@@ -8,18 +8,28 @@ int Widget::createWidget(int x, int y, int w, int h, std::string label){
     return buttons.size() - 1;
 }
 
-void Widget::updateWidget(SDL_Event& event){
-    if(event.type == SDL_KEYDOWN){
-        switch (event.key.keysym.sym){
+void Widget::updateWidget(SDL_Event& event, GameState& gameState) {
+    if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
             case SDLK_DOWN:
-                curWid = (curWid+1) % buttons.size();
+                if (curWid < buttons.size() - 1) {
+                    curWid++;
+                }
                 break;
             case SDLK_UP:
-                curWid = (curWid-1 + buttons.size()) % buttons.size();
+                if (curWid > 0) {
+                    curWid--;
+                }
                 break;
             case SDLK_RETURN:
-                cout<<"Button pressed:  "<<buttons[curWid].label<<"\n";
-                break; 
+                std::cout << "Button pressed: " << buttons[curWid].label << "\n";
+                if(buttons[curWid].label == "Start a new game"){
+                    gameState = STATE_GAME;
+                }
+                else if(buttons[curWid].label == "Exit ..."){
+                    gameState = STATE_END;
+                }
+                break;
         }
     }
 }
@@ -50,10 +60,55 @@ void Widget::button_render(SDL_Renderer* renderer, TTF_Font *font) {
 
         SDL_FreeSurface(textSurf);
         SDL_DestroyTexture(textTexture);
+
+        if (arrow.getTex() && curWid >= 0 && curWid < buttons.size()) {
+            const auto& selectedButton = buttons[curWid];
+            SDL_Rect arrowRect = {
+                selectedButton.rect.x - 70, 
+                selectedButton.rect.y + (selectedButton.rect.h - 30) / 2,
+                50, 40 
+            };
+            SDL_RenderCopy(renderer, arrow.getTex(), NULL, &arrowRect);
+        }
     }
 }
 
-
 void Widget::setButtonTexture(int index, const std::string& filename, SDL_Renderer* renderer){
     buttons[index].image.setImage(filename, renderer);
+}
+
+void Widget::loadArrow(const std::string& filename, SDL_Renderer* renderer){
+    arrow.setImage(filename, renderer);
+}
+
+void Widget::setBackground(const std::string& filename, SDL_Renderer* renderer){
+    background.setImage(filename, renderer);
+}
+
+void Widget::updateBackground(float dt){ //scrolling
+    backgroundX -= 50 * dt;
+    if(backgroundX <= -SCREEN_WIDTH){
+        backgroundX = 0;
+    }
+}
+
+void Widget::renderBackground(SDL_Renderer* renderer){
+    if(background.getTex()){
+        SDL_Rect bgRect1 = {
+            static_cast<int> (backgroundX),
+            0,
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT
+        };
+
+        SDL_Rect bgRect2 = {
+            static_cast<int> (backgroundX + SCREEN_WIDTH),
+            0,
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT
+        };
+
+        SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRect1);
+        SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRect2);
+    }
 }

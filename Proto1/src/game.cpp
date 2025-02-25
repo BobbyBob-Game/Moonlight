@@ -8,45 +8,67 @@ enum Direction {
     RUNNING_LEFT
 };
 
-enum GameState {
-    STATE_MENU,
-    STATE_GAME
-};
-
 Direction characterState = IDLE_RIGHT;
-GameState gameState;
+GameState gameState = STATE_MENU;
 
 Game::Game() {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << "\n";
+        running = false;
         return;
     }
-    if(TTF_Init() == -1){
-        std::cerr << "True type font could not initialized! Error: " << TTF_GetError() << "\n";
+    if (TTF_Init() == -1) {
+        std::cerr << "True type font could not be initialized! Error: " << TTF_GetError() << "\n";
+        running = false;
         return;
     }
 
     window = SDL_CreateWindow("Moonlight", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+    if (!window) {
+        std::cerr << "Failed to create window! SDL_Error: " << SDL_GetError() << "\n";
+        running = false;
+        return;
+    }
+
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer) {
+        std::cerr << "Failed to create renderer! SDL_Error: " << SDL_GetError() << "\n";
+        running = false;
+        return;
+    }
+
     font = TTF_OpenFont("assets/FONTS/8bitOperatorPlus8-Regular.ttf", 28);
+    if (!font) {
+        std::cerr << "Failed to load font! Error: " << TTF_GetError() << "\n";
+        running = false;
+        return;
+    }
+
     running = true;
     count = 0;
 
-    background.setImage("assets/MAP/Clouds 3/1.png", renderer);
-    
-    player.setImage("assets/PLAYER/player.png",renderer);
-    player.setDest(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 100, 63,63);
-    
-    idle_right = player.createCycle(2,63,63,10,10);
-    run_right = player.createCycle(1,63,63,16,10);
-    idle_left = player.createCycle(6,63,63,10,10);
-    run_left = player.createCycle(5,63,63,16,10);
+    // Load background
+    background.setImage("assets/MAP/Clouds 3/1.png", renderer); //ingame
+    menu.setBackground("assets/BUTTONS/0.png", renderer);
 
-    start_button = menu.createWidget(SCREEN_WIDTH/2 - 140 , SCREEN_HEIGHT/2 - 64, 288, 64, "Start a new game");
-    exit_button = menu.createWidget(SCREEN_WIDTH/2 - 140, SCREEN_HEIGHT/2, 288, 64, "Exit ...");
+    // Load player
+    player.setImage("assets/PLAYER/player.png", renderer);
+
+
+    player.setDest(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, 63, 63);
+
+    // Ensure animations are valid
+    idle_right = player.createCycle(2, 63, 63, 10, 10);
+    run_right = player.createCycle(1, 63, 63, 16, 10);
+    idle_left = player.createCycle(6, 63, 63, 10, 10);
+    run_left = player.createCycle(5, 63, 63, 16, 10);
+
+    start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 69, 288, 64, "Start a new game");
+    exit_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2, 288, 64, "Exit ...");
 
     menu.setButtonTexture(start_button, "assets/BUTTONS/buttons1.png", renderer);
     menu.setButtonTexture(exit_button, "assets/BUTTONS/buttons1.png", renderer);
+    menu.loadArrow("assets/BUTTONS/select_button.png", renderer);
 
     loadMap("assets/MAP/Ground.level");
 
@@ -56,6 +78,7 @@ Game::Game() {
 }
 
 Game::~Game(){
+    TTF_CloseFont(font);
     SDL_DestroyWindow(window);
     SDL_DestroyRenderer(renderer);
     TTF_Quit();
@@ -88,21 +111,22 @@ void Game::render() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT}; 
-    SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
-
-    if(gameState == STATE_MENU){
-        menu.button_render(renderer, font);
-        drawLetter("Moonlight", SCREEN_WIDTH/2 - 100, SCREEN_HEIGHT/4, 255, 255, 255, 40);
+    if (background.getTex()) {
+        SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+        SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
+    } else {
+        std::cerr << "Warning: Background texture is NULL!\n";
     }
-    else if(gameState == STATE_GAME){
+
+    if (gameState == STATE_MENU) {
+        menu.renderBackground(renderer);
+        menu.button_render(renderer, font);
+        drawLetter("Moonlight", SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 4, 255, 255, 255, 40);
+    } 
+    else if (gameState == STATE_GAME) {
         drawMap();
         draw(player);
-        menu.button_render(renderer, font);
     }
-    
-    // Move text rendering last, so nothing draws over it
-    //drawLetter("Start a new game", SCREEN_WIDTH/2, SCREEN_HEIGHT/2, 255, 255, 255, 28);
 
     SDL_RenderPresent(renderer);
 }
@@ -128,9 +152,11 @@ void Game::input() { //TODO: make the player jump
         if(event.type == SDL_QUIT){
             running = false;
         }
-        if(gameState == STATE_MENU){
-            menu.updateWidget(event);
-            
+        if (gameState == STATE_MENU) {
+            menu.updateWidget(event, gameState);
+            if (gameState == STATE_END) {
+                running = false;
+            }
         }
         
 
@@ -177,6 +203,14 @@ void Game::input() { //TODO: make the player jump
 
 
 void Game::update() {
+    Uint32 currentTime = SDL_GetTicks();
+    float dt = (currentTime - lastFrameTime) / 1000.0f; // Delta time in seconds
+    lastFrameTime = currentTime;
+
+    if(gameState == STATE_MENU){
+        menu.updateBackground(dt);
+    }
+    
     if(gameState == STATE_GAME){
         if(isJumping || fall){
             gravity_timer ++;
@@ -223,8 +257,7 @@ void Game::update() {
         fall = true; 
         for (int i = 0; i < map.size(); i++) {
             if (collision(player, map[i]) && map[i].getSolid()) {
-                // If moving down (falling), align player on top of platform
-                if (UpVelocity > 0) {
+                if (UpVelocity > 0) { //falling
                     isJumping = false;
                     fall = false;
                     UpVelocity = 0;

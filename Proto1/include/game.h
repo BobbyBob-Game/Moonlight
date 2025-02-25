@@ -35,6 +35,7 @@ class Game {
 
     int count;
     int frameCount, timerFPS, lastFrame;
+    Uint32 lastFrameTime;
 
     Entity player;
     Object background;
@@ -51,16 +52,16 @@ class Game {
     bool isJumping = false;
     double UpVelocity = 0; //vertical speed of jump
     const double jumpForce = -30;
-    const int GRAVITY = 9; //pixel based 
+    const int GRAVITY = 15; //pixel based 
     int gravity_timer = 0;
     int idle_left, idle_right, run_left, run_right;
 
     int start_button;
     int exit_button;
 
-    const int JUMP_BUFFER_FRAME = 6;
+    const int JUMP_BUFFER_FRAME = 10;
     const int FLYING_TIME_FRAME = 8;
-    const int MAX_FALL_SPEED = 7;
+    const int MAX_FALL_SPEED = 20;
     const int JUMP_HOLD_TIMER = 12;
     const int JUMP_HOLD_FORCE = -1;
     int jumpHoldTimer = 0;
