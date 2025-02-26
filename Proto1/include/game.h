@@ -1,11 +1,14 @@
 #ifndef GAME_H_INCLUDED
 #define GAME_H_INCLUDED
 #include <iostream>
+#include <map>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <vector>
 #include <fstream>
+#include <sstream>
+
 
 #include "object.h"
 #include "entity.h"
@@ -21,8 +24,12 @@ class Game {
     void update();
     void render();
     void draw(Object o);
-    void loadMap(const char *filename);
+
+    void loadMap(const char *filename, int sizeX, int sizeY);
     void drawMap();
+    void AddTile(int id, int x, int y);
+    void loadTileTexture();
+
     void drawLetter(const char* msg, int x, int y, int r, int g, int b, int size);
     bool collision(Object a, Object b);
 
@@ -40,7 +47,9 @@ class Game {
     Entity player;
     Object background;
 
-    vector<Object> map;
+    vector<vector<int>> tileMap;
+    map<int, SDL_Texture*> tileTextures;
+
     int mapX, mapY;
     int scrollingSpeed;
 

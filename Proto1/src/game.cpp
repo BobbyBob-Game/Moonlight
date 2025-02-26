@@ -48,14 +48,12 @@ Game::Game() {
     count = 0;
 
     // Load background
-    background.setImage("assets/MAP/Clouds 3/1.png", renderer); //ingame
+    background.setImage("assets/MAP/background_cave.png", renderer); //ingame
     menu.setBackground("assets/BUTTONS/0.png", renderer);
 
     // Load player
     player.setImage("assets/PLAYER/player.png", renderer);
-
-
-    player.setDest(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, 63, 63);
+    player.setDest(5, 0, 63, 63);
 
     // Ensure animations are valid
     idle_right = player.createCycle(2, 63, 63, 10, 10);
@@ -70,7 +68,8 @@ Game::Game() {
     menu.setButtonTexture(exit_button, "assets/BUTTONS/buttons1.png", renderer);
     menu.loadArrow("assets/BUTTONS/select_button.png", renderer);
 
-    loadMap("assets/MAP/Ground.level");
+    loadTileTexture();
+    loadMap("assets/MAP/first_level.csv", 40,30);
 
     mapX = mapY = 0;
     scrollingSpeed = 1;
@@ -111,19 +110,18 @@ void Game::render() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    if (background.getTex()) {
-        SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-        SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
-    } else {
-        std::cerr << "Warning: Background texture is NULL!\n";
-    }
-
     if (gameState == STATE_MENU) {
         menu.renderBackground(renderer);
         menu.button_render(renderer, font);
         drawLetter("Moonlight", SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 4, 255, 255, 255, 40);
     } 
     else if (gameState == STATE_GAME) {
+        if (background.getTex()) {
+            SDL_Rect bgRectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+            SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRectDest);
+        } else {
+            std::cerr << "Warning: Background texture is NULL!\n";
+        }
         drawMap();
         draw(player);
     }
@@ -255,7 +253,7 @@ void Game::update() {
         
         // Collision handling
         fall = true; 
-        for (int i = 0; i < map.size(); i++) {
+        /*for (int i = 0; i < map.size(); i++) {
             if (collision(player, map[i]) && map[i].getSolid()) {
                 if (UpVelocity > 0) { //falling
                     isJumping = false;
@@ -272,7 +270,7 @@ void Game::update() {
                     player.setDest(player.getDX(), map[i].getDY() + map[i].getDH());
                 }
             }
-        }
+        }*/
 
         if(water && left){
             player.setDest(player.getDX() + (runningSpeedNormal)- (runningSpeedWater), player.getDY());
@@ -289,46 +287,56 @@ void Game::update() {
     }
 }
 
-void Game::loadMap(const char *filename){
-    Object temp; //creating a rect for each tile
-    temp.setImage("assets/MAP/Untitled.png", renderer);
-    int current, mx, my, mw,mh;
-    ifstream in(filename);
-    if(!in.is_open()){
-        cout<<"Failed to open map file"<<"\n";
+void Game::loadMap(const char *filename, int sizeX, int sizeY){
+    fstream mapFile(filename);
+    if (!mapFile.is_open()) {
+        cerr << "Error: Failed to open map file: " << filename << endl;
         return;
     }
-    in >> mw;
-    in >> mh;
-    in >> mx;
-    in >> my;
-    for(int i = 0; i < mh; i++){
-        for(int j = 0; j < mw; j++){
-            if(in.eof()){
-                cout<<"Reached end of file too soon\n";
-                return;
-            }
-            in >> current;
-            if(current != 0){ // not sky | the tileset must be in order
-                temp.setSource((current - 1)*TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
-                temp.setDest((j*TILE_SIZE) + mx, (i*TILE_SIZE) + my, TILE_SIZE, TILE_SIZE);
-                temp.setID(current);
-                if(current == 1){temp.setSolid(1);}
-                if(current == 2){temp.setSolid(0);}
-                map.push_back(temp);
-            }
+
+    tileMap.clear();
+    string line;
+
+    for(int y = 0; y < sizeY; y++){
+        vector<int> row;
+        if (!getline(mapFile, line)) {
+            cerr << "Error: Unexpected end of file in map!" << endl;
+            break;
         }
+        stringstream ss(line);
+
+        for(int x = 0; x < sizeX; x++){
+            int tileID;
+            if (!(ss >> tileID)) {  // Read full number instead of a single char
+                cerr << "Error: Invalid tile at (" << x << "," << y << ")" <<endl;
+                tileID = 0; // Default to empty
+            }
+            row.push_back(tileID);
+            if (ss.peek() == ',') ss.ignore(); // Skip comma
+        }
+        tileMap.push_back(row);
     }
-    in.close();
+
+    mapFile.close();
 }
 
-void Game::drawMap(){ //TODO: make map parallax scrolling
-    for(int i = 0; i < map.size(); i++){
-        if(map[i].getDX() >= mapX - TILE_SIZE& map[i].getDY() >= mapY & map[i].getDX() <= mapX + SCREEN_WIDTH + TILE_SIZE){
-            draw(map[i]);
+
+void Game::drawMap() {
+    for (int y = 0; y < tileMap.size(); y++) {
+        for (int x = 0; x < tileMap[y].size(); x++) {
+            int tileID = tileMap[y][x]; // Get tile ID from tileMap
+            cout << "Rendering tile ID: " << tileID << " at (" << x << "," << y << ")\n";
+            if (tileTextures.find(tileID) != tileTextures.end()) {
+                SDL_Texture* texture = tileTextures[tileID];
+
+                SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                SDL_RenderCopy(renderer, texture, NULL, &destRect);
+            }
         }
     }
 }
+
+
 
 bool Game::collision(Object a, Object b){
     if((a.getDX() < b.getDX() + b.getDW()) && 
@@ -383,4 +391,25 @@ void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int si
     SDL_FreeSurface(surfText);
     SDL_DestroyTexture(textureText);
     TTF_CloseFont(font);
+}
+
+void Game::AddTile(int id, int x, int y){
+    tileMap[y][x] = id;
+}
+
+void Game::loadTileTexture(){
+    tileTextures[1] = IMG_LoadTexture(renderer, "assets/MAP/tile1.png");
+    tileTextures[3] = IMG_LoadTexture(renderer, "assets/MAP/tile3.png");
+    tileTextures[6] = IMG_LoadTexture(renderer, "assets/MAP/tile6.png");
+    tileTextures[7] = IMG_LoadTexture(renderer, "assets/MAP/tile7.png");
+    tileTextures[8] = IMG_LoadTexture(renderer, "assets/MAP/tile8.png");
+    tileTextures[21] = IMG_LoadTexture(renderer, "assets/MAP/tile21.png");
+    tileTextures[22] = IMG_LoadTexture(renderer, "assets/MAP/tile22.png");
+
+    for (const auto& pair : tileTextures) {
+        if (!pair.second) {
+            std::cerr << "Error: Failed to load texture for tile ID " << pair.first 
+                      << "! SDL_Error: " << IMG_GetError() << "\n";
+        }
+    }
 }
