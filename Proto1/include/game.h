@@ -13,6 +13,7 @@
 #include "object.h"
 #include "entity.h"
 #include "widget.h"
+#include "dia.h"
 using namespace std;
 
 class Game {
@@ -39,6 +40,7 @@ class Game {
     bool running;
     TTF_Font *font;
     Widget menu;
+    Dia dialogueBox;
 
     int count;
     int frameCount, timerFPS, lastFrame;
@@ -46,6 +48,8 @@ class Game {
 
     Entity player;
     Object background;
+    Object dia;
+    Object gameTitle;
 
     vector<vector<int>> tileMap;
     map<int, SDL_Texture*> tileTextures;
@@ -54,28 +58,14 @@ class Game {
     int scrollingSpeed;
 
     const int runningSpeedNormal = 6; //6 m/s
-    const double runningSpeedWater = 1.76; //1.11 m/s
+
     bool left, right;
     bool fall = true;
     bool water = false;
-    bool isJumping = false;
-    double UpVelocity = 0; //vertical speed of jump
-    const double jumpForce = -30;
-    const int GRAVITY = 15; //pixel based 
-    int gravity_timer = 0;
     int idle_left, idle_right, run_left, run_right;
 
     int start_button;
     int exit_button;
-
-    const int JUMP_BUFFER_FRAME = 10;
-    const int FLYING_TIME_FRAME = 8;
-    const int MAX_FALL_SPEED = 20;
-    const int JUMP_HOLD_TIMER = 12;
-    const int JUMP_HOLD_FORCE = -1;
-    int jumpHoldTimer = 0;
-    int flyingTimer = 0;
-    int jumpBuffer = 0;
 };
 
 

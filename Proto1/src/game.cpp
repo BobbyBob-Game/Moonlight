@@ -49,11 +49,13 @@ Game::Game() {
 
     // Load background
     background.setImage("assets/MAP/background_cave.png", renderer); //ingame
+    dia.setImage("assets/BUTTONS/dialogue.png", renderer);
+    gameTitle.setImage("assets/BUTTONS/game_title.png", renderer);
     menu.setBackground("assets/BUTTONS/0.png", renderer);
 
     // Load player
     player.setImage("assets/PLAYER/player.png", renderer);
-    player.setDest(5, 0, 63, 63);
+    player.setDest(0, 0, 70, 70);
 
     // Ensure animations are valid
     idle_right = player.createCycle(2, 63, 63, 10, 10);
@@ -61,6 +63,7 @@ Game::Game() {
     idle_left = player.createCycle(6, 63, 63, 10, 10);
     run_left = player.createCycle(5, 63, 63, 16, 10);
 
+    //buttons on menu
     start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 69, 288, 64, "Start a new game");
     exit_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2, 288, 64, "Exit ...");
 
@@ -68,6 +71,11 @@ Game::Game() {
     menu.setButtonTexture(exit_button, "assets/BUTTONS/buttons1.png", renderer);
     menu.loadArrow("assets/BUTTONS/select_button.png", renderer);
 
+    //Dialogue
+    dialogueBox.font = font;
+    dialogueBox.renderer = renderer;
+
+    //Map
     loadTileTexture();
     loadMap("assets/MAP/first_level.csv", 40,30);
 
@@ -112,6 +120,8 @@ void Game::render() {
 
     if (gameState == STATE_MENU) {
         menu.renderBackground(renderer);
+        SDL_Rect titleRect = {SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 4 - 100, 300, 200};
+        SDL_RenderCopy(renderer, gameTitle.getTex(), NULL, &titleRect);
         menu.button_render(renderer, font);
         drawLetter("Moonlight", SCREEN_WIDTH / 2 - 100, SCREEN_HEIGHT / 4, 255, 255, 255, 40);
     } 
@@ -122,7 +132,12 @@ void Game::render() {
         } else {
             std::cerr << "Warning: Background texture is NULL!\n";
         }
+        //test dialogue:
+
         drawMap();
+        SDL_Rect diaRect = {SCREEN_WIDTH / 2 - 350, 10, 700, 160};
+        SDL_RenderCopy(renderer, dia.getTex(), NULL, &diaRect);
+        dialogueBox.render();
         draw(player);
     }
 
@@ -150,6 +165,9 @@ void Game::input() { //TODO: make the player jump
         if(event.type == SDL_QUIT){
             running = false;
         }
+        if(event.type == SDL_MOUSEBUTTONDOWN){
+            cout<<"mouse clicked\n";
+        }
         if (gameState == STATE_MENU) {
             menu.updateWidget(event, gameState);
             if (gameState == STATE_END) {
@@ -174,9 +192,6 @@ void Game::input() { //TODO: make the player jump
 
                     player.setCurrentAnimation(run_left);
                     characterState = RUNNING_LEFT;
-                }
-                if(event.key.keysym.sym == SDLK_UP && !isJumping && !fall){
-                    jumpBuffer = JUMP_BUFFER_FRAME;
                 }
 
             }
@@ -210,76 +225,44 @@ void Game::update() {
     }
     
     if(gameState == STATE_GAME){
-        if(isJumping || fall){
-            gravity_timer ++;
-            float gravityEffect = (gravity_timer < 5) ? (GRAVITY*0.5f) : GRAVITY;
-            UpVelocity += gravityEffect;
-            if(UpVelocity > MAX_FALL_SPEED){
-                UpVelocity = MAX_FALL_SPEED;
-            }
-        }
-        if(!isJumping && fall){
-            flyingTimer = (flyingTimer > 0) ? flyingTimer - 1 : 0;
-        }
-
-        if(jumpBuffer > 0) jumpBuffer--; //decrease jump buffer timer
-
-        if(jumpBuffer > 0 && (flyingTimer > 0 || !fall)){
-            isJumping = true;
-            UpVelocity = jumpForce;
-            gravity_timer = 0;
-            jumpBuffer = 0;
-            jumpHoldTimer = JUMP_HOLD_TIMER;
-        }
-        if(jumpHoldTimer > 0 && SDL_GetKeyboardState(NULL)[SDL_SCANCODE_UP]){
-            UpVelocity += JUMP_HOLD_FORCE;
-            jumpHoldTimer--;
-        }
-
-        player.setDest(player.getDX(), player.getDY() + UpVelocity);
+        dialogueBox.update(currentTime);
         // Apply horizontal movement
         if(left) {
             player.setDest(player.getDX() - runningSpeedNormal, player.getDY());
         }
-        else if(left && isJumping){
-            player.setDest(player.getDX() - runningSpeedNormal, player.getDY() + UpVelocity);
-        }
         if(right) {
             player.setDest(player.getDX() + runningSpeedNormal, player.getDY());
         }
-        else if(right && isJumping){
-            player.setDest(player.getDX() + runningSpeedNormal, player.getDY() + UpVelocity);
-        }
         
         // Collision handling
+        //outside if map
+        if(player.getDX() < 0){
+            player.setDest(0, player.getDY());
+        }
+        else if(player.getDX() + player.getDW() > SCREEN_WIDTH){
+            player.setDest(SCREEN_WIDTH - player.getDW() + 1, player.getDY());
+        }
+        else if(player.getDY() < 0){
+            player.setDest(player.getDX(),0);
+        }
+        else if(player.getDY() + player.getDH() > SCREEN_HEIGHT){
+            player.setDest(player.getDX(),SCREEN_HEIGHT - player.getDH());
+        }
+
+
+
+
+        //falling
         fall = true; 
-        /*for (int i = 0; i < map.size(); i++) {
-            if (collision(player, map[i]) && map[i].getSolid()) {
-                if (UpVelocity > 0) { //falling
-                    isJumping = false;
-                    fall = false;
-                    UpVelocity = 0;
-
-                    // Align player's feet exactly on top of the platform
-                    player.setDest(player.getDX(), map[i].getDY() - player.getDH());
-                    flyingTimer = FLYING_TIME_FRAME;
-                }
-                // If moving up (jumping) and hitting ceiling, stop upward movement
-                else if (UpVelocity < 0) {
-                    UpVelocity = 0;
-                    player.setDest(player.getDX(), map[i].getDY() + map[i].getDH());
-                }
-            }
-        }*/
-
-        if(water && left){
-            player.setDest(player.getDX() + (runningSpeedNormal)- (runningSpeedWater), player.getDY());
+        int tileX = player.getDX() / TILE_SIZE;
+        int tileY = (player.getDY() + player.getDH()) / TILE_SIZE; //the left corner
+        if(tileMap[tileY][tileX] == 6 || tileMap[tileY][tileX] == 7){
+            fall = false;
+            player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH() - 12);
         }
-        if(water && right){
-            player.setDest(player.getDX() - (runningSpeedNormal) + (runningSpeedWater), player.getDY());
+        else{
+            fall = true;
         }
-        //Need to know the position of player:
-        //cout<<player.getDX()<<":" <<player.getDY()<<"\n";
 
         menu.setDest(0, 0, 128, 64);
 
@@ -303,7 +286,7 @@ void Game::loadMap(const char *filename, int sizeX, int sizeY){
             cerr << "Error: Unexpected end of file in map!" << endl;
             break;
         }
-        stringstream ss(line);
+        stringstream ss(line); // to get doiuble digits number
 
         for(int x = 0; x < sizeX; x++){
             int tileID;
@@ -400,11 +383,18 @@ void Game::AddTile(int id, int x, int y){
 void Game::loadTileTexture(){
     tileTextures[1] = IMG_LoadTexture(renderer, "assets/MAP/tile1.png");
     tileTextures[3] = IMG_LoadTexture(renderer, "assets/MAP/tile3.png");
+    tileTextures[5] = IMG_LoadTexture(renderer, "assets/MAP/tile5.png");
     tileTextures[6] = IMG_LoadTexture(renderer, "assets/MAP/tile6.png");
     tileTextures[7] = IMG_LoadTexture(renderer, "assets/MAP/tile7.png");
     tileTextures[8] = IMG_LoadTexture(renderer, "assets/MAP/tile8.png");
     tileTextures[21] = IMG_LoadTexture(renderer, "assets/MAP/tile21.png");
     tileTextures[22] = IMG_LoadTexture(renderer, "assets/MAP/tile22.png");
+    tileTextures[24] = IMG_LoadTexture(renderer, "assets/MAP/tile24.png");
+    tileTextures[42] = IMG_LoadTexture(renderer, "assets/MAP/tile42.png");
+    tileTextures[63] = IMG_LoadTexture(renderer, "assets/MAP/tile63.png");
+    tileTextures[64] = IMG_LoadTexture(renderer, "assets/MAP/tile64.png");
+    tileTextures[65] = IMG_LoadTexture(renderer, "assets/MAP/tile65.png");
+    tileTextures[66] = IMG_LoadTexture(renderer, "assets/MAP/tile66.png");
 
     for (const auto& pair : tileTextures) {
         if (!pair.second) {
