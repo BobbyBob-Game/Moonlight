@@ -2,12 +2,14 @@
 #define GAME_H_INCLUDED
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <vector>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 
 #include "object.h"
@@ -28,13 +30,13 @@ class Game {
 
     void loadMap(const char *filename, int sizeX, int sizeY);
     void drawMap();
-    void AddTile(int id, int x, int y);
-    void loadTileTexture();
+    void loadTileTexture(int dimensionID);
 
     void drawLetter(const char* msg, int x, int y, int r, int g, int b, int size);
     bool collision(Object a, Object b);
 
     private:
+    int dimensionID;
     SDL_Renderer *renderer;
     SDL_Window* window;
     bool running;
@@ -51,8 +53,10 @@ class Game {
     Object dia;
     Object gameTitle;
 
-    vector<vector<int>> tileMap;
-    map<int, SDL_Texture*> tileTextures;
+    vector<vector<int>> tileMap1;
+    vector<vector<int>> tileMap2;
+    map<int, SDL_Texture*> tileTextures1;
+    map<int, SDL_Texture*> tileTextures2;
 
     int mapX, mapY;
     int scrollingSpeed;

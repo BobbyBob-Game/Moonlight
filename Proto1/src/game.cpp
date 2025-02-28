@@ -52,6 +52,7 @@ Game::Game() {
     dia.setImage("assets/BUTTONS/dialogue.png", renderer);
     gameTitle.setImage("assets/BUTTONS/game_title.png", renderer);
     menu.setBackground("assets/BUTTONS/0.png", renderer);
+    dimensionID = 1;
 
     // Load player
     player.setImage("assets/PLAYER/player.png", renderer);
@@ -74,10 +75,6 @@ Game::Game() {
     //Dialogue
     dialogueBox.font = font;
     dialogueBox.renderer = renderer;
-
-    //Map
-    loadTileTexture();
-    loadMap("assets/MAP/first_level.csv", 40,30);
 
     mapX = mapY = 0;
     scrollingSpeed = 1;
@@ -165,9 +162,6 @@ void Game::input() { //TODO: make the player jump
         if(event.type == SDL_QUIT){
             running = false;
         }
-        if(event.type == SDL_MOUSEBUTTONDOWN){
-            cout<<"mouse clicked\n";
-        }
         if (gameState == STATE_MENU) {
             menu.updateWidget(event, gameState);
             if (gameState == STATE_END) {
@@ -177,7 +171,19 @@ void Game::input() { //TODO: make the player jump
         
 
         else if(gameState == STATE_GAME){
-                
+
+            if(event.type == SDL_MOUSEBUTTONDOWN){
+                cout<<"mouse clicked\n";
+                if(dimensionID == 1){
+                    dimensionID = 2;
+                }                
+                else {
+                    dimensionID = 1;
+                }
+                cout<<"Current dimension id is: "<<dimensionID<<"\n";
+                loadTileTexture(dimensionID);
+                loadMap(dimensionID == 1 ? "assets/MAP/first_level.csv" : "assets/MAP/dimension2", 40, 30);
+            }
             // Handle key press (only change state once)
             if(event.type == SDL_KEYDOWN) {
                 if(event.key.keysym.sym == SDLK_RIGHT && characterState != RUNNING_RIGHT && event.key.repeat == 0){
@@ -256,12 +262,13 @@ void Game::update() {
         fall = true; 
         int tileX = player.getDX() / TILE_SIZE;
         int tileY = (player.getDY() + player.getDH()) / TILE_SIZE; //the left corner
-        if(tileMap[tileY][tileX] == 6 || tileMap[tileY][tileX] == 7){
-            fall = false;
-            player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH() - 12);
-        }
-        else{
-            fall = true;
+        if (tileY >= 0 && tileY < tileMap1.size() && 
+            tileX >= 0 && tileX < tileMap1[tileY].size()) {
+            
+            if(tileMap1[tileY][tileX] == 6 || tileMap1[tileY][tileX] == 7){
+                fall = false;
+                player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH() - 12);
+            }
         }
 
         menu.setDest(0, 0, 128, 64);
@@ -270,34 +277,38 @@ void Game::update() {
     }
 }
 
-void Game::loadMap(const char *filename, int sizeX, int sizeY){
+void Game::loadMap(const char *filename, int sizeX, int sizeY) {
     fstream mapFile(filename);
     if (!mapFile.is_open()) {
         cerr << "Error: Failed to open map file: " << filename << endl;
         return;
     }
 
-    tileMap.clear();
+    // Initialize maps with proper dimensions
+    vector<vector<int>> newMap(sizeY, vector<int>(sizeX, 0));
+    
     string line;
-
-    for(int y = 0; y < sizeY; y++){
-        vector<int> row;
+    for(int y = 0; y < sizeY; y++) {
         if (!getline(mapFile, line)) {
-            cerr << "Error: Unexpected end of file in map!" << endl;
+            cerr << "Error: Unexpected end of file at line " << y << endl;
             break;
         }
-        stringstream ss(line); // to get doiuble digits number
 
-        for(int x = 0; x < sizeX; x++){
-            int tileID;
-            if (!(ss >> tileID)) {  // Read full number instead of a single char
-                cerr << "Error: Invalid tile at (" << x << "," << y << ")" <<endl;
-                tileID = 0; // Default to empty
+        stringstream ss(line);
+        for(int x = 0; x < sizeX; x++) {
+            int tileID = 0;
+            if (ss >> tileID) {
+                newMap[y][x] = tileID;
             }
-            row.push_back(tileID);
-            if (ss.peek() == ',') ss.ignore(); // Skip comma
+            if (ss.peek() == ',') ss.ignore();
         }
-        tileMap.push_back(row);
+    }
+
+    // Safely assign to correct dimension
+    if (dimensionID == 1) {
+        tileMap1 = newMap;
+    } else {
+        tileMap2 = newMap;
     }
 
     mapFile.close();
@@ -305,19 +316,37 @@ void Game::loadMap(const char *filename, int sizeX, int sizeY){
 
 
 void Game::drawMap() {
-    for (int y = 0; y < tileMap.size(); y++) {
-        for (int x = 0; x < tileMap[y].size(); x++) {
-            int tileID = tileMap[y][x]; // Get tile ID from tileMap
-            cout << "Rendering tile ID: " << tileID << " at (" << x << "," << y << ")\n";
-            if (tileTextures.find(tileID) != tileTextures.end()) {
-                SDL_Texture* texture = tileTextures[tileID];
-
-                SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
-                SDL_RenderCopy(renderer, texture, NULL, &destRect);
+    if (dimensionID == 1) {
+        if (tileMap1.empty()) return; // Check if tileMap1 is empty
+        for (int y = 0; y < tileMap1.size(); y++) {
+            for (int x = 0; x < tileMap1[y].size(); x++) {
+                int tileID = tileMap1[y][x];
+                if (tileTextures1.find(tileID) != tileTextures1.end()) {
+                    SDL_Texture* texture = tileTextures1[tileID];
+                    if (texture) { // Check if texture is not null
+                        SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                        SDL_RenderCopy(renderer, texture, NULL, &destRect);
+                    }
+                }
+            }
+        }
+    } else {
+        if (tileMap2.empty()) return; // Check if tileMap2 is empty
+        for (int y = 0; y < tileMap2.size(); y++) {
+            for (int x = 0; x < tileMap2[y].size(); x++) {
+                int tileID = tileMap2[y][x];
+                if (tileTextures2.find(tileID) != tileTextures2.end()) {
+                    SDL_Texture* texture = tileTextures2[tileID];
+                    if (texture) { // Check if texture is not null
+                        SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                        SDL_RenderCopy(renderer, texture, NULL, &destRect);
+                    }
+                }
             }
         }
     }
 }
+
 
 
 
@@ -376,30 +405,50 @@ void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int si
     TTF_CloseFont(font);
 }
 
-void Game::AddTile(int id, int x, int y){
-    tileMap[y][x] = id;
-}
+void Game::loadTileTexture(int dimensionID) {
+    std::unordered_map<int, std::string> tileTexturePaths;
 
-void Game::loadTileTexture(){
-    tileTextures[1] = IMG_LoadTexture(renderer, "assets/MAP/tile1.png");
-    tileTextures[3] = IMG_LoadTexture(renderer, "assets/MAP/tile3.png");
-    tileTextures[5] = IMG_LoadTexture(renderer, "assets/MAP/tile5.png");
-    tileTextures[6] = IMG_LoadTexture(renderer, "assets/MAP/tile6.png");
-    tileTextures[7] = IMG_LoadTexture(renderer, "assets/MAP/tile7.png");
-    tileTextures[8] = IMG_LoadTexture(renderer, "assets/MAP/tile8.png");
-    tileTextures[21] = IMG_LoadTexture(renderer, "assets/MAP/tile21.png");
-    tileTextures[22] = IMG_LoadTexture(renderer, "assets/MAP/tile22.png");
-    tileTextures[24] = IMG_LoadTexture(renderer, "assets/MAP/tile24.png");
-    tileTextures[42] = IMG_LoadTexture(renderer, "assets/MAP/tile42.png");
-    tileTextures[63] = IMG_LoadTexture(renderer, "assets/MAP/tile63.png");
-    tileTextures[64] = IMG_LoadTexture(renderer, "assets/MAP/tile64.png");
-    tileTextures[65] = IMG_LoadTexture(renderer, "assets/MAP/tile65.png");
-    tileTextures[66] = IMG_LoadTexture(renderer, "assets/MAP/tile66.png");
+    if (dimensionID == 1) {
+        tileTexturePaths = {
+            {1, "assets/MAP/Dimension1/tile1.png"}, {3, "assets/MAP/Dimension1/tile3.png"},
+            {5, "assets/MAP/Dimension1/tile5.png"}, {6, "assets/MAP/Dimension1/tile6.png"},
+            {7, "assets/MAP/Dimension1/tile7.png"}, {8, "assets/MAP/Dimension1/tile8.png"},
+            {21, "assets/MAP/Dimension1/tile21.png"}, {22, "assets/MAP/Dimension1/tile22.png"}, {24, "assets/MAP/Dimension1/tile24.png"},
+            {42, "assets/MAP/Dimension1/tile42.png"}, {63, "assets/MAP/Dimension1/tile63.png"}, {64, "assets/MAP/Dimension1/tile64.png"},
+            {65, "assets/MAP/Dimension1/tile65.png"}, {66, "assets/MAP/Dimension1/tile66.png"}
+        };
+    } else {
+        tileTexturePaths = {
+            {1, "assets/MAP/Dimension2/di2_tile1.png"}, {3, "assets/MAP/Dimension2/di2_tile3.png"},
+            {4, "assets/MAP/Dimension2/di2_tile4.png"}, {5, "assets/MAP/Dimension2/di2_tile5.png"},
+            {6, "assets/MAP/Dimension2/di2_tile6.png"}, {7, "assets/MAP/Dimension2/di2_tile7.png"},
+            {9, "assets/MAP/Dimension2/di2_tile9.png"}, {11, "assets/MAP/Dimension2/di2_tile11.png"},
+            {16, "assets/MAP/Dimension2/di2_tile16.png"},{18, "assets/MAP/Dimension2/di2_tile18.png"},
+            {19, "assets/MAP/Dimension2/di2_tile19.png"}, {48, "assets/MAP/Dimension2/di2_tile48.png"},
+            {49, "assets/MAP/Dimension2/di2_tile49.png"}, {50, "assets/MAP/Dimension2/di2_tile50.png"} 
+        };
+    }
 
-    for (const auto& pair : tileTextures) {
-        if (!pair.second) {
-            std::cerr << "Error: Failed to load texture for tile ID " << pair.first 
-                      << "! SDL_Error: " << IMG_GetError() << "\n";
+    for (auto& pair : tileTextures1) {
+        SDL_DestroyTexture(pair.second);
+    }
+    tileTextures1.clear();
+
+    for (auto& pair : tileTextures2) {
+        SDL_DestroyTexture(pair.second);
+    }
+    tileTextures2.clear();
+
+    // Load new textures
+    for (auto& pair : tileTexturePaths) {
+        SDL_Surface* surface = IMG_Load(pair.second.c_str());
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_FreeSurface(surface);
+
+        if (dimensionID == 1) {
+            tileTextures1[pair.first] = texture;
+        } else {
+            tileTextures2[pair.first] = texture;
         }
     }
 }
