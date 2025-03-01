@@ -5,9 +5,13 @@ enum Direction {
     IDLE_RIGHT,
     IDLE_LEFT,
     RUNNING_RIGHT,
-    RUNNING_LEFT
+    RUNNING_LEFT,
+    DASH_LEFT,
+    DASH_RIGHT
 };
 
+Uint32 lastFrameTime = SDL_GetTicks();
+float dt = 0.0f;
 Direction characterState = IDLE_RIGHT;
 GameState gameState = STATE_MENU;
 
@@ -52,17 +56,17 @@ Game::Game() {
     dia.setImage("assets/BUTTONS/dialogue.png", renderer);
     gameTitle.setImage("assets/BUTTONS/game_title.png", renderer);
     menu.setBackground("assets/BUTTONS/0.png", renderer);
-    dimensionID = 1;
 
     // Load player
     player.setImage("assets/PLAYER/player.png", renderer);
-    player.setDest(0, 0, 70, 70);
+    player.setDest(0, 0, 72, 72);
 
     // Ensure animations are valid
     idle_right = player.createCycle(2, 63, 63, 10, 10);
     run_right = player.createCycle(1, 63, 63, 16, 10);
     idle_left = player.createCycle(6, 63, 63, 10, 10);
     run_left = player.createCycle(5, 63, 63, 16, 10);
+    dash = player.createCycle(9, 63, 63, 5, 10);
 
     //buttons on menu
     start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 69, 288, 64, "Start a new game");
@@ -75,6 +79,12 @@ Game::Game() {
     //Dialogue
     dialogueBox.font = font;
     dialogueBox.renderer = renderer;
+
+    //Map:
+    dimensionID = 1; 
+    loadTileTexture(dimensionID); 
+    loadMap("assets/MAP/first_level.csv", 40, 30);
+
 
     mapX = mapY = 0;
     scrollingSpeed = 1;
@@ -199,6 +209,10 @@ void Game::input() { //TODO: make the player jump
                     player.setCurrentAnimation(run_left);
                     characterState = RUNNING_LEFT;
                 }
+                if(event.key.keysym.sym == SDLK_LSHIFT && event.key.repeat == 0){
+                    player.setCurrentAnimation(dash);
+                    characterState = DASH_RIGHT;
+                }
 
             }
             // Handle key release (only change state once)
@@ -223,7 +237,7 @@ void Game::input() { //TODO: make the player jump
 
 void Game::update() {
     Uint32 currentTime = SDL_GetTicks();
-    float dt = (currentTime - lastFrameTime) / 1000.0f; // Delta time in seconds
+    dt = (currentTime - lastFrameTime) / 1000.0f; 
     lastFrameTime = currentTime;
 
     if(gameState == STATE_MENU){
@@ -232,13 +246,32 @@ void Game::update() {
     
     if(gameState == STATE_GAME){
         dialogueBox.update(currentTime);
-        // Apply horizontal movement
-        if(left) {
-            player.setDest(player.getDX() - runningSpeedNormal, player.getDY());
+
+        if (left) {
+            velX -= ACCELERATION;  // Accelerate left
+        } 
+        if (right) {
+            velX += ACCELERATION;  // Accelerate right
         }
-        if(right) {
-            player.setDest(player.getDX() + runningSpeedNormal, player.getDY());
+        
+        // Apply speed limit
+        if (velX > MAX_SPEED) velX = MAX_SPEED;
+        if (velX < -MAX_SPEED) velX = -MAX_SPEED;
+        
+        // Apply friction if no movement keys are pressed
+        if (!left && !right) {
+            if (velX > 0) {
+                velX -= FRICTION;
+                if (velX < 0) velX = 0;  // Stop completely
+            }
+            else if (velX < 0) {
+                velX += FRICTION;
+                if (velX > 0) velX = 0;  // Stop completely
+            }
         }
+        
+        // Update player position
+        player.setDest(player.getDX() + velX, player.getDY());
         
         // Collision handling
         //outside if map
@@ -246,7 +279,7 @@ void Game::update() {
             player.setDest(0, player.getDY());
         }
         else if(player.getDX() + player.getDW() > SCREEN_WIDTH){
-            player.setDest(SCREEN_WIDTH - player.getDW() + 1, player.getDY());
+            player.setDest(SCREEN_WIDTH - player.getDW(), player.getDY());
         }
         else if(player.getDY() < 0){
             player.setDest(player.getDX(),0);
@@ -262,18 +295,22 @@ void Game::update() {
         fall = true; 
         int tileX = player.getDX() / TILE_SIZE;
         int tileY = (player.getDY() + player.getDH()) / TILE_SIZE; //the left corner
-        if (tileY >= 0 && tileY < tileMap1.size() && 
-            tileX >= 0 && tileX < tileMap1[tileY].size()) {
-            
-            if(tileMap1[tileY][tileX] == 6 || tileMap1[tileY][tileX] == 7){
-                fall = false;
-                player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH() - 12);
+        if(fall){
+            player.setDest(player.getDX(), player.getDY() + GRAVITY);
+            if (tileY >= 0 && tileY < tileMap1.size() && 
+                tileX >= 0 && tileX < tileMap1[tileY].size()) {
+                    
+                if(tileMap1[tileY][tileX] == 6 || tileMap1[tileY][tileX] == 7){
+                    fall = false;
+                    player.setDest(player.getDX(), tileY*TILE_SIZE - player.getDH());
+                }
             }
         }
+        
 
         menu.setDest(0, 0, 128, 64);
 
-        player.updateAnimation();
+        player.updateAnimation(dt);
     }
 }
 

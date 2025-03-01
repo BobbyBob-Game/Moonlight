@@ -16,7 +16,7 @@ void Dia::render() {
 }
 
 void Dia::update(Uint32 currentTime) {
-    if (currentTime > lastUpdate + 80) { 
+    if (currentTime > lastUpdate + 60) { 
         if (visibleChars < text.length()) {
             visibleChars++;
         }

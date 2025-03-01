@@ -12,6 +12,15 @@ enum GameState {
     STATE_GAME,
     STATE_END
 };
+
+const int SUBPIXELS_PER_PIXEL = 8;
+const float ACCELERATION = 0.046875f * SUBPIXELS_PER_PIXEL; // 12 subpixels
+const float DECELERATION = 0.5f * SUBPIXELS_PER_PIXEL;      // 128 subpixels
+const float MAX_SPEED = 3.0f * SUBPIXELS_PER_PIXEL;         // 96 subpixels
+const float FRICTION = 0.1f * SUBPIXELS_PER_PIXEL;     // 12 subpixels
+const float GRAVITY = 0.5f*SUBPIXELS_PER_PIXEL;
+
+
 extern GameState gameState; //or use pragma once, prevent multiple definition
 
 #endif

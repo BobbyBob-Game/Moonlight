@@ -12,21 +12,22 @@ int Entity::createCycle(int r, int w, int h, int amount, int speed){
     return animations.size() - 1; //return the index of the newly added cycle
 }
 
-void Entity::updateAnimation(){
-    if (begin > animations[curAnim].speed) { 
+void Entity::updateAnimation(float deltaTime){
+    begin += deltaTime * 130;
+    if (begin >= animations[curAnim].speed) { 
+        begin = 0; 
         if(!rev) {
             animations[curAnim].tick++; 
         }
         if(rev){
             animations[curAnim].tick--;
         }
-        begin = 0; 
     }
-    begin++;
 
     if (animations[curAnim].tick >= animations[curAnim].amount) {
         animations[curAnim].tick = 0;
     }
+
     if (animations[curAnim].tick <= 0){
         if(nAb){
             curAnim = newAnim;

@@ -1,5 +1,6 @@
 #ifndef GAME_H_INCLUDED
 #define GAME_H_INCLUDED
+
 #include <iostream>
 #include <map>
 #include <unordered_map>
@@ -11,17 +12,18 @@
 #include <sstream>
 #include <cstring>
 
-
 #include "object.h"
 #include "entity.h"
 #include "widget.h"
 #include "dia.h"
+
 using namespace std;
 
 class Game {
-    public:
+public:
     Game();
     ~Game();
+
     void loop();
     void input();
     void update();
@@ -35,18 +37,17 @@ class Game {
     void drawLetter(const char* msg, int x, int y, int r, int g, int b, int size);
     bool collision(Object a, Object b);
 
-    private:
+private:
     int dimensionID;
     SDL_Renderer *renderer;
-    SDL_Window* window;
+    SDL_Window *window;
     bool running;
     TTF_Font *font;
     Widget menu;
     Dia dialogueBox;
 
     int count;
-    int frameCount, timerFPS, lastFrame;
-    Uint32 lastFrameTime;
+    int frameCount, timerFPS;
 
     Entity player;
     Object background;
@@ -55,23 +56,25 @@ class Game {
 
     vector<vector<int>> tileMap1;
     vector<vector<int>> tileMap2;
-    map<int, SDL_Texture*> tileTextures1;
-    map<int, SDL_Texture*> tileTextures2;
+    map<int, SDL_Texture *> tileTextures1;
+    map<int, SDL_Texture *> tileTextures2;
 
     int mapX, mapY;
     int scrollingSpeed;
 
-    const int runningSpeedNormal = 6; //6 m/s
+    const int runningSpeedNormal = 6; // 6 m/s
+    float velX = 0;
 
     bool left, right;
     bool fall = true;
     bool water = false;
-    int idle_left, idle_right, run_left, run_right;
+    int idle_left, idle_right, run_left, run_right, dash;
 
     int start_button;
     int exit_button;
 };
 
-
+extern Uint32 lastFrameTime;
+extern float dt;
 
 #endif
