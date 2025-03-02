@@ -1,13 +1,19 @@
 #ifndef ENTITY_H_INCLUDED
 #define ENTITY_H_INCLUDED
 #include "object.h"
+#include "defs.h"
 #include <iostream>
 #include <vector>
 using namespace std;
 
 class Entity  : public Object {
     public: 
-    Entity () {rev = false;}
+    float xpos, ypos;
+    bool onGround = false;
+    float velX = 0.0f;
+    float velY = 0.0f;
+    
+    Entity () {}
     void setHealth(int h) {health = h;}
     void setmaxHealth(int h) {maxHealth = h;}
     int getHealth() const {return health;}
@@ -16,14 +22,14 @@ class Entity  : public Object {
     void setCurrentAnimation(int c) {begin = 0; curAnim = c;}
     int getcurAnimation() const {return curAnim;}
     void updateAnimation(float deltaTime);
-    void reverseNeed(bool r, int nA) {rev = r; nAb = 1; nA = newAnim;}
-    void reverse(int nA) {nAb = 1 ;nA = newAnim;}
+    bool isonGround() {return onGround;}
+    void StartJump();
+    void EndJump();
+    void Update();
 
     private:
     int health, maxHealth;
-    float xpos, ypos;
-    float xspeed, yspeed;
-    float groundSpeed;
+
     struct cycle {
         int row;
         int w;

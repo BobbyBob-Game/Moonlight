@@ -36,6 +36,9 @@ public:
 
     void drawLetter(const char* msg, int x, int y, int r, int g, int b, int size);
     bool collision(Object a, Object b);
+    bool isSolidTile(int tileID, int dimensionID);
+    std::vector<std::vector<int>>& getCurrentTileMap();
+
 
 private:
     int dimensionID;
@@ -59,15 +62,13 @@ private:
     map<int, SDL_Texture *> tileTextures1;
     map<int, SDL_Texture *> tileTextures2;
 
-    int mapX, mapY;
-    int scrollingSpeed;
-
-    const int runningSpeedNormal = 6; // 6 m/s
     float velX = 0;
+    float velY = 0;
 
     bool left, right;
     bool fall = true;
-    bool water = false;
+    bool jump = false;
+    bool onGround = false;
     int idle_left, idle_right, run_left, run_right, dash;
 
     int start_button;

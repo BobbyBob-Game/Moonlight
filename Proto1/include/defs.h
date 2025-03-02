@@ -14,12 +14,15 @@ enum GameState {
 };
 
 const int SUBPIXELS_PER_PIXEL = 8;
-const float ACCELERATION = 0.046875f * SUBPIXELS_PER_PIXEL; // 12 subpixels
+const float ACCELERATION = 0.05f * SUBPIXELS_PER_PIXEL; // 12 subpixels
 const float DECELERATION = 0.5f * SUBPIXELS_PER_PIXEL;      // 128 subpixels
-const float MAX_SPEED = 3.0f * SUBPIXELS_PER_PIXEL;         // 96 subpixels
-const float FRICTION = 0.1f * SUBPIXELS_PER_PIXEL;     // 12 subpixels
+const float MAX_SPEED = 1.25f * SUBPIXELS_PER_PIXEL;         // 96 subpixels
+const float FRICTION = 0.15f * SUBPIXELS_PER_PIXEL;     // 12 subpixels
 const float GRAVITY = 0.5f*SUBPIXELS_PER_PIXEL;
 
+const float JUMP_FORCE   = 15.0f;    // Increase this for a strong jump
+const float GRAVITY_UP   = 30.0f;   // Gravity while ascending (lower for a slight float)
+const float GRAVITY_DOWN = 50.0f;
 
 extern GameState gameState; //or use pragma once, prevent multiple definition
 

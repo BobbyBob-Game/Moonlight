@@ -5,9 +5,7 @@ enum Direction {
     IDLE_RIGHT,
     IDLE_LEFT,
     RUNNING_RIGHT,
-    RUNNING_LEFT,
-    DASH_LEFT,
-    DASH_RIGHT
+    RUNNING_LEFT
 };
 
 Uint32 lastFrameTime = SDL_GetTicks();
@@ -15,7 +13,7 @@ float dt = 0.0f;
 Direction characterState = IDLE_RIGHT;
 GameState gameState = STATE_MENU;
 
-Game::Game() {
+Game::Game() : dialogueBox(renderer,font) {
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << "\n";
         running = false;
@@ -66,7 +64,6 @@ Game::Game() {
     run_right = player.createCycle(1, 63, 63, 16, 10);
     idle_left = player.createCycle(6, 63, 63, 10, 10);
     run_left = player.createCycle(5, 63, 63, 16, 10);
-    dash = player.createCycle(9, 63, 63, 5, 10);
 
     //buttons on menu
     start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 69, 288, 64, "Start a new game");
@@ -84,10 +81,6 @@ Game::Game() {
     dimensionID = 1; 
     loadTileTexture(dimensionID); 
     loadMap("assets/MAP/first_level.csv", 40, 30);
-
-
-    mapX = mapY = 0;
-    scrollingSpeed = 1;
     loop();
 }
 
@@ -120,7 +113,6 @@ void Game::loop() {
     }
 }
 
-
 void Game::render() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
@@ -151,8 +143,6 @@ void Game::render() {
     SDL_RenderPresent(renderer);
 }
 
-
-
 void Game::draw(Object o) {
     SDL_Rect dest = o.getDest();
     SDL_Rect src = o.getSource();
@@ -164,7 +154,6 @@ void Game::draw(Object o) {
 
     SDL_RenderCopyEx(renderer, o.getTex(), &src, &dest, 0, NULL, SDL_FLIP_NONE);
 }
-
 
 void Game::input() { //TODO: make the player jump
     SDL_Event event;
@@ -178,19 +167,11 @@ void Game::input() { //TODO: make the player jump
                 running = false;
             }
         }
-        
 
         else if(gameState == STATE_GAME){
 
             if(event.type == SDL_MOUSEBUTTONDOWN){
-                cout<<"mouse clicked\n";
-                if(dimensionID == 1){
-                    dimensionID = 2;
-                }                
-                else {
-                    dimensionID = 1;
-                }
-                cout<<"Current dimension id is: "<<dimensionID<<"\n";
+                dimensionID = (dimensionID == 1) ? 2 : 1;
                 loadTileTexture(dimensionID);
                 loadMap(dimensionID == 1 ? "assets/MAP/first_level.csv" : "assets/MAP/dimension2", 40, 30);
             }
@@ -209,9 +190,8 @@ void Game::input() { //TODO: make the player jump
                     player.setCurrentAnimation(run_left);
                     characterState = RUNNING_LEFT;
                 }
-                if(event.key.keysym.sym == SDLK_LSHIFT && event.key.repeat == 0){
-                    player.setCurrentAnimation(dash);
-                    characterState = DASH_RIGHT;
+                if(event.key.keysym.sym == SDLK_SPACE) {
+                    jump = true;
                 }
 
             }
@@ -240,13 +220,14 @@ void Game::update() {
     dt = (currentTime - lastFrameTime) / 1000.0f; 
     lastFrameTime = currentTime;
 
-    if(gameState == STATE_MENU){
+    if(gameState == STATE_MENU) {
         menu.updateBackground(dt);
     }
     
-    if(gameState == STATE_GAME){
-        dialogueBox.update(currentTime);
+    if(gameState == STATE_GAME) {
+        dialogueBox.update(SDL_GetTicks());
 
+        // --- Horizontal Movement ---
         if (left) {
             velX -= ACCELERATION;  // Accelerate left
         } 
@@ -254,7 +235,7 @@ void Game::update() {
             velX += ACCELERATION;  // Accelerate right
         }
         
-        // Apply speed limit
+        // Apply speed limits
         if (velX > MAX_SPEED) velX = MAX_SPEED;
         if (velX < -MAX_SPEED) velX = -MAX_SPEED;
         
@@ -262,57 +243,109 @@ void Game::update() {
         if (!left && !right) {
             if (velX > 0) {
                 velX -= FRICTION;
-                if (velX < 0) velX = 0;  // Stop completely
-            }
-            else if (velX < 0) {
+                velX -= DECELERATION;
+                if (velX < 0) velX = 0;
+            } else if (velX < 0) {
                 velX += FRICTION;
-                if (velX > 0) velX = 0;  // Stop completely
+                velX += DECELERATION;
+                if (velX > 0) velX = 0;
             }
+        }
+
+        // --- Jump Mechanics ---
+        if (jump && onGround) {
+            velY = -JUMP_FORCE;  // Launch upward
+            onGround = false;
+            jump = false;
+        }
+
+        // Apply gravity (you can combine GRAVITY with GRAVITY_UP/DOWN as needed)
+        velY += GRAVITY * dt;
+        if (velY < 0) {
+            velY += GRAVITY_UP * dt;
+        } else {
+            velY += GRAVITY_DOWN * dt;
         }
         
         // Update player position
-        player.setDest(player.getDX() + velX, player.getDY());
+        player.setDest(player.getDX() + velX, player.getDY() + velY);
         
-        // Collision handling
-        //outside if map
-        if(player.getDX() < 0){
+        // --- Boundary Collision Handling ---
+        // Horizontal boundaries
+        if (player.getDX() < 0) {
             player.setDest(0, player.getDY());
-        }
-        else if(player.getDX() + player.getDW() > SCREEN_WIDTH){
+            velX = 0;
+        } else if (player.getDX() + player.getDW() > SCREEN_WIDTH) {
             player.setDest(SCREEN_WIDTH - player.getDW(), player.getDY());
+            velX = 0;
         }
-        else if(player.getDY() < 0){
-            player.setDest(player.getDX(),0);
+        // Vertical boundaries
+        if (player.getDY() < 0) {
+            player.setDest(player.getDX(), 0);
+            velY = 0;
+        } else if (player.getDY() + player.getDH() > SCREEN_HEIGHT) {
+            player.setDest(player.getDX(), SCREEN_HEIGHT - player.getDH());
+            velY = 0;
+            onGround = true;
         }
-        else if(player.getDY() + player.getDH() > SCREEN_HEIGHT){
-            player.setDest(player.getDX(),SCREEN_HEIGHT - player.getDH());
-        }
 
-
-
-
-        //falling
-        fall = true; 
+        std::vector<std::vector<int>>& currentMap = getCurrentTileMap();
         int tileX = player.getDX() / TILE_SIZE;
-        int tileY = (player.getDY() + player.getDH()) / TILE_SIZE; //the left corner
-        if(fall){
-            player.setDest(player.getDX(), player.getDY() + GRAVITY);
-            if (tileY >= 0 && tileY < tileMap1.size() && 
-                tileX >= 0 && tileX < tileMap1[tileY].size()) {
-                    
-                if(tileMap1[tileY][tileX] == 6 || tileMap1[tileY][tileX] == 7){
-                    fall = false;
-                    player.setDest(player.getDX(), tileY*TILE_SIZE - player.getDH());
+        int tileY = (player.getDY() + player.getDH()) / TILE_SIZE;
+        if(tileY >= 0 && tileY < currentMap.size() &&
+           tileX >= 0 && tileX < currentMap[tileY].size()) {
+            if(isSolidTile(currentMap[tileY][tileX], dimensionID)) {
+                // Adjust player position so the bottom of the hitbox sits flush with the tile.
+                player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH());
+                velY = 0;
+                onGround = true;
+            }
+        }
+        
+        if(velY < 0) {
+            int topTile  = player.getDY() / TILE_SIZE;
+            int leftTile = player.getDX() / TILE_SIZE;
+            int rightTile = (player.getDX() + player.getDW() - 1) / TILE_SIZE;
+            if(topTile >= 0 && topTile < currentMap.size()) {
+                if(isSolidTile(currentMap[topTile][leftTile], dimensionID) ||
+                   isSolidTile(currentMap[topTile][rightTile], dimensionID)) {
+                    player.setDest(player.getDX(), (topTile + 1) * TILE_SIZE);
+                    velY = 0;
+                }
+            }
+        }
+
+        if(velX < 0) {
+            int leftTile = player.getDX() / TILE_SIZE;
+            int topTile = player.getDY() / TILE_SIZE;
+            int bottomTile = (player.getDY() + player.getDH() - 1) / TILE_SIZE;
+            if(leftTile >= 0) {
+                if(isSolidTile(currentMap[topTile][leftTile], dimensionID) ||
+                   isSolidTile(currentMap[bottomTile][leftTile], dimensionID)) {
+                    player.setDest((leftTile + 1) * TILE_SIZE, player.getDY());
+                    velX = 0;
+                }
+            }
+        }
+
+        if(velX > 0) {
+            int rightTile = (player.getDX() + player.getDW() - 1) / TILE_SIZE;
+            int topTile = player.getDY() / TILE_SIZE;
+            int bottomTile = (player.getDY() + player.getDH() - 1) / TILE_SIZE;
+            if(rightTile < currentMap[0].size()) {
+                if(isSolidTile(currentMap[topTile][rightTile], dimensionID) ||
+                   isSolidTile(currentMap[bottomTile][rightTile], dimensionID)) {
+                    player.setDest(rightTile * TILE_SIZE - player.getDW(), player.getDY());
+                    velX = 0;
                 }
             }
         }
         
-
         menu.setDest(0, 0, 128, 64);
-
         player.updateAnimation(dt);
     }
 }
+
 
 void Game::loadMap(const char *filename, int sizeX, int sizeY) {
     fstream mapFile(filename);
@@ -351,7 +384,6 @@ void Game::loadMap(const char *filename, int sizeX, int sizeY) {
     mapFile.close();
 }
 
-
 void Game::drawMap() {
     if (dimensionID == 1) {
         if (tileMap1.empty()) return; // Check if tileMap1 is empty
@@ -383,9 +415,6 @@ void Game::drawMap() {
         }
     }
 }
-
-
-
 
 bool Game::collision(Object a, Object b){
     if((a.getDX() < b.getDX() + b.getDW()) && 
@@ -488,4 +517,21 @@ void Game::loadTileTexture(int dimensionID) {
             tileTextures2[pair.first] = texture;
         }
     }
+}
+
+bool Game::isSolidTile(int tileID, int dimensionID) {
+    if(dimensionID == 1){
+        return (tileID == 63 || tileID == 64 || tileID == 66 ||
+            tileID == 6  || tileID == 7  || tileID == 3  ||
+            tileID == 8  || tileID == 1  || tileID == 5);
+    }
+    else if(dimensionID == 2){
+        return (tileID == 0 || tileID == 1 || tileID == 3 || tileID == 4 || tileID == 5 || tileID == 6 ||
+        tileID == 7);
+    }
+    
+}
+
+std::vector<std::vector<int>>& Game::getCurrentTileMap() {
+    return (dimensionID == 1) ? tileMap1 : tileMap2;
 }
