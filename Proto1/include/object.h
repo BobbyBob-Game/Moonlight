@@ -13,6 +13,7 @@ class Object {
     int id;
 
     public:
+    bool facingLeft = false;
     Object() {solid = 1;}
     SDL_Rect getDest() const {return dest;}
     SDL_Rect getSource() const {return src;}

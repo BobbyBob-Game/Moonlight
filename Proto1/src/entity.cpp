@@ -2,27 +2,22 @@
 
 int Entity::createCycle(int r, int w, int h, int amount, int speed){
     cycle temp;
-    temp.row = r-1;
-    temp.w = w;
-    temp.h = h;
+    temp.row    = r-1;
+    temp.w      = w;
+    temp.h      = h;
     temp.amount = amount;
-    temp.speed = speed;
-    temp.tick = 0;
+    temp.speed  = speed;
+    temp.tick   = 0;
     animations.push_back(temp);
     return animations.size() - 1; //return the index of the newly added cycle
 }
 
 void Entity::updateAnimation(float deltaTime){
-    begin += deltaTime * 130;
     if (begin >= animations[curAnim].speed) { 
         begin = 0; 
-        if(!rev) {
-            animations[curAnim].tick++; 
-        }
-        if(rev){
-            animations[curAnim].tick--;
-        }
+        animations[curAnim].tick++; 
     }
+    begin++;
 
     if (animations[curAnim].tick >= animations[curAnim].amount) {
         animations[curAnim].tick = 0;
@@ -32,7 +27,6 @@ void Entity::updateAnimation(float deltaTime){
         if(nAb){
             curAnim = newAnim;
             nAb = 0;
-            rev = 0;
         }
         else{
             animations[curAnim].tick = 0;
@@ -41,7 +35,7 @@ void Entity::updateAnimation(float deltaTime){
 
     
     setSource(animations[curAnim].w * animations[curAnim].tick, 
-        animations[curAnim].row * animations[curAnim].h, 
+        animations[curAnim].row * 97, 
         animations[curAnim].w, animations[curAnim].h);
 
 }
@@ -58,22 +52,31 @@ void Entity::EndJump() {
     }
 }
 
-void Entity::Update() {
-
-    velY += GRAVITY;  // Apply gravity each frame
-    ypos += velY;     // Move player vertically
-    xpos += velX;     // Move player horizontally
-
-    // Ground Collision
-    if (ypos > 175.0f) {  // If below ground level
-        ypos = 175.0f;    // Snap to ground
-        velY = 0.0f;      // Reset vertical speed
-        onGround = true;  // Allow jumping again
+void Entity::checkHorizontalCollisions(float newX){
+    if (newX < 0) {
+        newX = 0;
+        velX = 0;
+    }
+    else if (newX + getDW() > SCREEN_WIDTH) {
+        newX = SCREEN_WIDTH - getDW();
+        velX = 0;
     }
 
-    // Wall Collision
-    if (xpos < 10 || xpos > 190) {
-        velX *= -1;  // Reverse direction on walls
-    }
+    // Assign back to the entity
+    xpos = newX;
 }
 
+void Entity::checkVerticalCollisions(float newY){
+    if (newY < 0) {
+        newY = 0;
+        velY = 0;
+    }
+    else if (newY + getDH() > SCREEN_HEIGHT) {
+        newY = SCREEN_HEIGHT - getDH();
+        velY = 0;
+        onGround = true;
+    }
+
+    // Assign back to the entity
+    ypos = newY;
+}

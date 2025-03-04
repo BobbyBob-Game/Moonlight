@@ -1,7 +1,6 @@
 #ifndef DEFS_H_INCLUDED
 #define DEFS_H_INCLUDED
-
-#define SCREEN_WIDTH 960 //40x30 tiles of 24x24
+#define SCREEN_WIDTH 960 
 #define SCREEN_HEIGHT 720
 
 #define TILE_SIZE 24
@@ -12,6 +11,14 @@ enum GameState {
     STATE_GAME,
     STATE_END
 };
+
+enum Direction {
+    IDLE_RIGHT,
+    IDLE_LEFT,
+    RUNNING_RIGHT,
+    RUNNING_LEFT
+};
+
 
 const int SUBPIXELS_PER_PIXEL = 8;
 const float ACCELERATION = 0.05f * SUBPIXELS_PER_PIXEL; // 12 subpixels
@@ -25,5 +32,6 @@ const float GRAVITY_UP   = 30.0f;   // Gravity while ascending (lower for a slig
 const float GRAVITY_DOWN = 50.0f;
 
 extern GameState gameState; //or use pragma once, prevent multiple definition
+extern Direction characterState;
 
 #endif

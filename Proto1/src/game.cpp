@@ -1,19 +1,11 @@
 #include "game.h"
 #include "defs.h"
-
-enum Direction {
-    IDLE_RIGHT,
-    IDLE_LEFT,
-    RUNNING_RIGHT,
-    RUNNING_LEFT
-};
-
 Uint32 lastFrameTime = SDL_GetTicks();
 float dt = 0.0f;
 Direction characterState = IDLE_RIGHT;
 GameState gameState = STATE_MENU;
 
-Game::Game() : dialogueBox(renderer,font) {
+Game::Game() : dialogueBox(renderer,font), currentMap(1, nullptr){
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         std::cerr << "SDL could not initialize! SDL_Error: " << SDL_GetError() << "\n";
         running = false;
@@ -56,14 +48,12 @@ Game::Game() : dialogueBox(renderer,font) {
     menu.setBackground("assets/BUTTONS/0.png", renderer);
 
     // Load player
-    player.setImage("assets/PLAYER/player.png", renderer);
+    player.setImage("assets/PLAYER/Owlboy.png", renderer);
     player.setDest(0, 0, 72, 72);
 
     // Ensure animations are valid
-    idle_right = player.createCycle(2, 63, 63, 10, 10);
-    run_right = player.createCycle(1, 63, 63, 16, 10);
-    idle_left = player.createCycle(6, 63, 63, 10, 10);
-    run_left = player.createCycle(5, 63, 63, 16, 10);
+    idle_right = player.createCycle(8, 112, 80, 9, 10);
+    run_right = player.createCycle(2, 112, 80, 10, 10);
 
     //buttons on menu
     start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 69, 288, 64, "Start a new game");
@@ -79,8 +69,9 @@ Game::Game() : dialogueBox(renderer,font) {
 
     //Map:
     dimensionID = 1; 
-    loadTileTexture(dimensionID); 
-    loadMap("assets/MAP/first_level.csv", 40, 30);
+    currentMap = Map(dimensionID, renderer);
+    currentMap.loadTileTexture(); 
+    currentMap.loadMap("assets/MAP/first_level.csv", 40, 30);
     loop();
 }
 
@@ -133,7 +124,7 @@ void Game::render() {
         }
         //test dialogue:
 
-        drawMap();
+        currentMap.drawMap();
         SDL_Rect diaRect = {SCREEN_WIDTH / 2 - 350, 10, 700, 160};
         SDL_RenderCopy(renderer, dia.getTex(), NULL, &diaRect);
         dialogueBox.render();
@@ -152,10 +143,15 @@ void Game::draw(Object o) {
         return;
     }
 
-    SDL_RenderCopyEx(renderer, o.getTex(), &src, &dest, 0, NULL, SDL_FLIP_NONE);
+    SDL_RendererFlip flipType = SDL_FLIP_NONE;
+    if(o.facingLeft){
+        flipType = SDL_FLIP_HORIZONTAL;
+    }
+
+    SDL_RenderCopyEx(renderer, o.getTex(), &src, &dest, 0, NULL, flipType);
 }
 
-void Game::input() { //TODO: make the player jump
+void Game::input() {
     SDL_Event event;
     while(SDL_PollEvent(&event)){
         if(event.type == SDL_QUIT){
@@ -172,8 +168,9 @@ void Game::input() { //TODO: make the player jump
 
             if(event.type == SDL_MOUSEBUTTONDOWN){
                 dimensionID = (dimensionID == 1) ? 2 : 1;
-                loadTileTexture(dimensionID);
-                loadMap(dimensionID == 1 ? "assets/MAP/first_level.csv" : "assets/MAP/dimension2", 40, 30);
+                currentMap = Map(dimensionID, renderer);
+                currentMap.loadTileTexture();
+                currentMap.loadMap(dimensionID == 1 ? "assets/MAP/first_level.csv" : "assets/MAP/dimension2", 40, 30);
             }
             // Handle key press (only change state once)
             if(event.type == SDL_KEYDOWN) {
@@ -181,13 +178,14 @@ void Game::input() { //TODO: make the player jump
                     left = 0;
                     right = 1;
                     player.setCurrentAnimation(run_right);
+                    player.facingLeft = false;
                     characterState = RUNNING_RIGHT;
                 }
                 if(event.key.keysym.sym == SDLK_LEFT && characterState != RUNNING_LEFT && event.key.repeat == 0){
                     left = 1;
                     right = 0;
-
-                    player.setCurrentAnimation(run_left);
+                    player.setCurrentAnimation(run_right);
+                    player.facingLeft = true;
                     characterState = RUNNING_LEFT;
                 }
                 if(event.key.keysym.sym == SDLK_SPACE) {
@@ -206,14 +204,13 @@ void Game::input() { //TODO: make the player jump
                 if(event.key.keysym.sym == SDLK_LEFT && characterState == RUNNING_LEFT){
                     left = 0; // Stop movement
                     right = 0;
-                    player.setCurrentAnimation(idle_left);
+                    player.setCurrentAnimation(idle_right);
                     characterState = IDLE_LEFT;
                 }
             }
         }        
     }
 }
-
 
 void Game::update() {
     Uint32 currentTime = SDL_GetTicks();
@@ -226,7 +223,6 @@ void Game::update() {
     
     if(gameState == STATE_GAME) {
         dialogueBox.update(SDL_GetTicks());
-
         // --- Horizontal Movement ---
         if (left) {
             velX -= ACCELERATION;  // Accelerate left
@@ -234,12 +230,10 @@ void Game::update() {
         if (right) {
             velX += ACCELERATION;  // Accelerate right
         }
-        
-        // Apply speed limits
+
         if (velX > MAX_SPEED) velX = MAX_SPEED;
         if (velX < -MAX_SPEED) velX = -MAX_SPEED;
-        
-        // Apply friction if no movement keys are pressed
+
         if (!left && !right) {
             if (velX > 0) {
                 velX -= FRICTION;
@@ -252,14 +246,12 @@ void Game::update() {
             }
         }
 
-        // --- Jump Mechanics ---
         if (jump && onGround) {
             velY = -JUMP_FORCE;  // Launch upward
             onGround = false;
             jump = false;
         }
 
-        // Apply gravity (you can combine GRAVITY with GRAVITY_UP/DOWN as needed)
         velY += GRAVITY * dt;
         if (velY < 0) {
             velY += GRAVITY_UP * dt;
@@ -269,163 +261,11 @@ void Game::update() {
         
         // Update player position
         player.setDest(player.getDX() + velX, player.getDY() + velY);
-        
-        // --- Boundary Collision Handling ---
-        // Horizontal boundaries
-        if (player.getDX() < 0) {
-            player.setDest(0, player.getDY());
-            velX = 0;
-        } else if (player.getDX() + player.getDW() > SCREEN_WIDTH) {
-            player.setDest(SCREEN_WIDTH - player.getDW(), player.getDY());
-            velX = 0;
-        }
-        // Vertical boundaries
-        if (player.getDY() < 0) {
-            player.setDest(player.getDX(), 0);
-            velY = 0;
-        } else if (player.getDY() + player.getDH() > SCREEN_HEIGHT) {
-            player.setDest(player.getDX(), SCREEN_HEIGHT - player.getDH());
-            velY = 0;
-            onGround = true;
-        }
-
-        std::vector<std::vector<int>>& currentMap = getCurrentTileMap();
-        int tileX = player.getDX() / TILE_SIZE;
-        int tileY = (player.getDY() + player.getDH()) / TILE_SIZE;
-        if(tileY >= 0 && tileY < currentMap.size() &&
-           tileX >= 0 && tileX < currentMap[tileY].size()) {
-            if(isSolidTile(currentMap[tileY][tileX], dimensionID)) {
-                // Adjust player position so the bottom of the hitbox sits flush with the tile.
-                player.setDest(player.getDX(), tileY * TILE_SIZE - player.getDH());
-                velY = 0;
-                onGround = true;
-            }
-        }
-        
-        if(velY < 0) {
-            int topTile  = player.getDY() / TILE_SIZE;
-            int leftTile = player.getDX() / TILE_SIZE;
-            int rightTile = (player.getDX() + player.getDW() - 1) / TILE_SIZE;
-            if(topTile >= 0 && topTile < currentMap.size()) {
-                if(isSolidTile(currentMap[topTile][leftTile], dimensionID) ||
-                   isSolidTile(currentMap[topTile][rightTile], dimensionID)) {
-                    player.setDest(player.getDX(), (topTile + 1) * TILE_SIZE);
-                    velY = 0;
-                }
-            }
-        }
-
-        if(velX < 0) {
-            int leftTile = player.getDX() / TILE_SIZE;
-            int topTile = player.getDY() / TILE_SIZE;
-            int bottomTile = (player.getDY() + player.getDH() - 1) / TILE_SIZE;
-            if(leftTile >= 0) {
-                if(isSolidTile(currentMap[topTile][leftTile], dimensionID) ||
-                   isSolidTile(currentMap[bottomTile][leftTile], dimensionID)) {
-                    player.setDest((leftTile + 1) * TILE_SIZE, player.getDY());
-                    velX = 0;
-                }
-            }
-        }
-
-        if(velX > 0) {
-            int rightTile = (player.getDX() + player.getDW() - 1) / TILE_SIZE;
-            int topTile = player.getDY() / TILE_SIZE;
-            int bottomTile = (player.getDY() + player.getDH() - 1) / TILE_SIZE;
-            if(rightTile < currentMap[0].size()) {
-                if(isSolidTile(currentMap[topTile][rightTile], dimensionID) ||
-                   isSolidTile(currentMap[bottomTile][rightTile], dimensionID)) {
-                    player.setDest(rightTile * TILE_SIZE - player.getDW(), player.getDY());
-                    velX = 0;
-                }
-            }
-        }
+        currentMap.tileCollision(player, velX, velY, onGround);
+        currentMap.clampObjectPosition(player, velX, velY, onGround);
         
         menu.setDest(0, 0, 128, 64);
         player.updateAnimation(dt);
-    }
-}
-
-
-void Game::loadMap(const char *filename, int sizeX, int sizeY) {
-    fstream mapFile(filename);
-    if (!mapFile.is_open()) {
-        cerr << "Error: Failed to open map file: " << filename << endl;
-        return;
-    }
-
-    // Initialize maps with proper dimensions
-    vector<vector<int>> newMap(sizeY, vector<int>(sizeX, 0));
-    
-    string line;
-    for(int y = 0; y < sizeY; y++) {
-        if (!getline(mapFile, line)) {
-            cerr << "Error: Unexpected end of file at line " << y << endl;
-            break;
-        }
-
-        stringstream ss(line);
-        for(int x = 0; x < sizeX; x++) {
-            int tileID = 0;
-            if (ss >> tileID) {
-                newMap[y][x] = tileID;
-            }
-            if (ss.peek() == ',') ss.ignore();
-        }
-    }
-
-    // Safely assign to correct dimension
-    if (dimensionID == 1) {
-        tileMap1 = newMap;
-    } else {
-        tileMap2 = newMap;
-    }
-
-    mapFile.close();
-}
-
-void Game::drawMap() {
-    if (dimensionID == 1) {
-        if (tileMap1.empty()) return; // Check if tileMap1 is empty
-        for (int y = 0; y < tileMap1.size(); y++) {
-            for (int x = 0; x < tileMap1[y].size(); x++) {
-                int tileID = tileMap1[y][x];
-                if (tileTextures1.find(tileID) != tileTextures1.end()) {
-                    SDL_Texture* texture = tileTextures1[tileID];
-                    if (texture) { // Check if texture is not null
-                        SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
-                        SDL_RenderCopy(renderer, texture, NULL, &destRect);
-                    }
-                }
-            }
-        }
-    } else {
-        if (tileMap2.empty()) return; // Check if tileMap2 is empty
-        for (int y = 0; y < tileMap2.size(); y++) {
-            for (int x = 0; x < tileMap2[y].size(); x++) {
-                int tileID = tileMap2[y][x];
-                if (tileTextures2.find(tileID) != tileTextures2.end()) {
-                    SDL_Texture* texture = tileTextures2[tileID];
-                    if (texture) { // Check if texture is not null
-                        SDL_Rect destRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
-                        SDL_RenderCopy(renderer, texture, NULL, &destRect);
-                    }
-                }
-            }
-        }
-    }
-}
-
-bool Game::collision(Object a, Object b){
-    if((a.getDX() < b.getDX() + b.getDW()) && 
-    (a.getDX() + a.getDW() > b.getDX()) && 
-    (a.getDY() < b.getDY() + b.getDH()) && 
-    (a.getDY() + a.getDH() > b.getDY())) {  
-        return true;
-    }
-
-    else{
-        return false;
     }
 }
 
@@ -469,69 +309,4 @@ void Game::drawLetter(const char* msg, int x, int y, int r, int g, int b, int si
     SDL_FreeSurface(surfText);
     SDL_DestroyTexture(textureText);
     TTF_CloseFont(font);
-}
-
-void Game::loadTileTexture(int dimensionID) {
-    std::unordered_map<int, std::string> tileTexturePaths;
-
-    if (dimensionID == 1) {
-        tileTexturePaths = {
-            {1, "assets/MAP/Dimension1/tile1.png"}, {3, "assets/MAP/Dimension1/tile3.png"},
-            {5, "assets/MAP/Dimension1/tile5.png"}, {6, "assets/MAP/Dimension1/tile6.png"},
-            {7, "assets/MAP/Dimension1/tile7.png"}, {8, "assets/MAP/Dimension1/tile8.png"},
-            {21, "assets/MAP/Dimension1/tile21.png"}, {22, "assets/MAP/Dimension1/tile22.png"}, {24, "assets/MAP/Dimension1/tile24.png"},
-            {42, "assets/MAP/Dimension1/tile42.png"}, {63, "assets/MAP/Dimension1/tile63.png"}, {64, "assets/MAP/Dimension1/tile64.png"},
-            {65, "assets/MAP/Dimension1/tile65.png"}, {66, "assets/MAP/Dimension1/tile66.png"}
-        };
-    } else {
-        tileTexturePaths = {
-            {1, "assets/MAP/Dimension2/di2_tile1.png"}, {3, "assets/MAP/Dimension2/di2_tile3.png"},
-            {4, "assets/MAP/Dimension2/di2_tile4.png"}, {5, "assets/MAP/Dimension2/di2_tile5.png"},
-            {6, "assets/MAP/Dimension2/di2_tile6.png"}, {7, "assets/MAP/Dimension2/di2_tile7.png"},
-            {9, "assets/MAP/Dimension2/di2_tile9.png"}, {11, "assets/MAP/Dimension2/di2_tile11.png"},
-            {16, "assets/MAP/Dimension2/di2_tile16.png"},{18, "assets/MAP/Dimension2/di2_tile18.png"},
-            {19, "assets/MAP/Dimension2/di2_tile19.png"}, {48, "assets/MAP/Dimension2/di2_tile48.png"},
-            {49, "assets/MAP/Dimension2/di2_tile49.png"}, {50, "assets/MAP/Dimension2/di2_tile50.png"} 
-        };
-    }
-
-    for (auto& pair : tileTextures1) {
-        SDL_DestroyTexture(pair.second);
-    }
-    tileTextures1.clear();
-
-    for (auto& pair : tileTextures2) {
-        SDL_DestroyTexture(pair.second);
-    }
-    tileTextures2.clear();
-
-    // Load new textures
-    for (auto& pair : tileTexturePaths) {
-        SDL_Surface* surface = IMG_Load(pair.second.c_str());
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-        SDL_FreeSurface(surface);
-
-        if (dimensionID == 1) {
-            tileTextures1[pair.first] = texture;
-        } else {
-            tileTextures2[pair.first] = texture;
-        }
-    }
-}
-
-bool Game::isSolidTile(int tileID, int dimensionID) {
-    if(dimensionID == 1){
-        return (tileID == 63 || tileID == 64 || tileID == 66 ||
-            tileID == 6  || tileID == 7  || tileID == 3  ||
-            tileID == 8  || tileID == 1  || tileID == 5);
-    }
-    else if(dimensionID == 2){
-        return (tileID == 0 || tileID == 1 || tileID == 3 || tileID == 4 || tileID == 5 || tileID == 6 ||
-        tileID == 7);
-    }
-    
-}
-
-std::vector<std::vector<int>>& Game::getCurrentTileMap() {
-    return (dimensionID == 1) ? tileMap1 : tileMap2;
 }

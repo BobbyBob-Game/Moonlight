@@ -16,6 +16,7 @@
 #include "entity.h"
 #include "widget.h"
 #include "dia.h"
+#include "map.h"
 
 using namespace std;
 
@@ -56,11 +57,7 @@ private:
     Object background;
     Object dia;
     Object gameTitle;
-
-    vector<vector<int>> tileMap1;
-    vector<vector<int>> tileMap2;
-    map<int, SDL_Texture *> tileTextures1;
-    map<int, SDL_Texture *> tileTextures2;
+    Map currentMap;
 
     float velX = 0;
     float velY = 0;
