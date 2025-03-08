@@ -8,10 +8,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <fstream>
+#include <sstream>
 
 
-static const int SCREEN_WIDTH = 800;
-static const int SCREEN_HEIGHT = 600;
+static const int SCREEN_WIDTH = 1280;
+static const int SCREEN_HEIGHT = 720;
 const int TILE_SIZE = 32; //25x18
 
 #endif

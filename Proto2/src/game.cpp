@@ -2,7 +2,7 @@
 
 Game::Game()
     : gWindow(nullptr), gRenderer(nullptr), gLayer1(nullptr), gLayer2(nullptr), gLayer3(nullptr),
-      offset1(0.0f), offset2(0.0f), offset3(0.0f), player(nullptr) {
+      offset1(0.0f), offset2(0.0f), offset3(0.0f), player(nullptr), currentMap(nullptr){
 }
 
 Game::~Game() {
@@ -35,6 +35,9 @@ bool Game::init() {
         std::cout << "SDL_image could not initialize! SDL_image Error: " << IMG_GetError() << "\n";
         return false;
     }
+    currentMap = Map(gRenderer);
+    currentMap.loadTileTexture();
+    currentMap.loadMap("assets/TileMap/chunk1.csv", 40, 22);
     
     return true;
 }
@@ -72,7 +75,6 @@ bool Game::loadMedia() {
 void Game::run() {
     bool quit = false;
     SDL_Event e;
-    
     Uint32 lastTime = SDL_GetTicks();
     
     while (!quit) {
@@ -87,6 +89,7 @@ void Game::run() {
         float deltaTime = (currentTime - lastTime) / 1000.0f;
         lastTime = currentTime;
 
+        // ------ PLAYER ------- //
         player->update(deltaTime);
 
         offset1 -= baseSpeed * 0.2f * deltaTime;
@@ -94,31 +97,43 @@ void Game::run() {
         offset3 -= baseSpeed * 1.0f * deltaTime;
         offset4 -= baseSpeed * 1.2f * deltaTime;
 
-        if (offset1 < -SCREEN_WIDTH) offset1 += SCREEN_WIDTH;
-        if (offset2 < -SCREEN_WIDTH) offset2 += SCREEN_WIDTH;
-        if (offset3 < -SCREEN_WIDTH) offset3 += SCREEN_WIDTH;
-        if (offset4 < -SCREEN_WIDTH) offset4 += SCREEN_WIDTH;
+        if (offset1 <= -SCREEN_WIDTH) offset1 = 0;
+        if (offset2 <= -SCREEN_WIDTH) offset2 = 0;
+        if (offset3 <= -SCREEN_WIDTH) offset3 = 0;
+        if (offset4 <= -SCREEN_WIDTH) offset4 = 0;
 
         SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
         SDL_RenderClear(gRenderer);
 
-        for (int i = 0; i < 2; ++i) { //problematic
-            SDL_Rect destRect1 = { static_cast<int>(offset1) + i * SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-            SDL_RenderCopy(gRenderer, gLayer1, nullptr, &destRect1);
-            
-            SDL_Rect destRect2 = { static_cast<int>(offset2) + i * SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-            SDL_RenderCopy(gRenderer, gLayer2, nullptr, &destRect2);
-            
-            SDL_Rect destRect3 = { static_cast<int>(offset3) + i * SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-            SDL_RenderCopy(gRenderer, gLayer3, nullptr, &destRect3);
+        renderBackground(gRenderer, gLayer1, offset1);
+        renderBackground(gRenderer, gLayer2, offset2);
+        renderBackground(gRenderer, gLayer3, offset3);
+        renderBackground(gRenderer, gLayer4, offset4);
 
-            SDL_Rect destRect4 = { static_cast<int>(offset4) + i * SCREEN_WIDTH, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-            SDL_RenderCopy(gRenderer, gLayer4, nullptr, &destRect4);
-        }
-
+        // ------ MAPS --------//
+        currentMap.drawMap();
         player->render(gRenderer);
 
         SDL_RenderPresent(gRenderer);
+    }
+}
+
+void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX){
+    if(gLayerX != nullptr){
+        SDL_Rect bgRect1 = {
+            static_cast<int> (offsetX),
+            0,
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT
+        };
+        SDL_Rect bgRect2 = {
+            static_cast<int> (offsetX + SCREEN_WIDTH),
+            0,
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT
+        };
+        SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect1);
+        SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect2);
     }
 }
 
@@ -127,13 +142,14 @@ void Game::close() {
     SDL_DestroyTexture(gLayer1);
     SDL_DestroyTexture(gLayer2);
     SDL_DestroyTexture(gLayer3);
-    gLayer1 = gLayer2 = gLayer3 = nullptr;
+    SDL_DestroyTexture(gLayer4);
+    gLayer1 = gLayer2 = gLayer3 = gLayer4 = nullptr;
     
     if (player) {
         delete player;
         player = nullptr;
     }
-
+    //Tile::cleanUp();
     SDL_DestroyRenderer(gRenderer);
     SDL_DestroyWindow(gWindow);
     gRenderer = nullptr;

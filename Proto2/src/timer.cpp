@@ -20,4 +20,5 @@ double Time::getFPS() {
     else{
         SDL_GetTicks() - start;
     }
+    return 0;
 }

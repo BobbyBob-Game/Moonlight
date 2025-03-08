@@ -5,6 +5,7 @@
 #include <SDL2/SDL_image.h>
 #include "player.h"
 #include "defs.h"
+#include "map.h"
 
 class Game {
 public:
@@ -16,6 +17,7 @@ public:
 
     // Loads media for background and player
     bool loadMedia();
+    void renderBackground(SDL_Renderer* renderer, SDL_Texture *gLayerX, float offsetX);
 
     // Main game loop
     void run();
@@ -41,6 +43,9 @@ private:
     float offset2;
     float offset3;
     float offset4;
+
+    //Map:
+    Map currentMap;    
 
     // Base speed for scrolling
     const float baseSpeed = 100.0f;

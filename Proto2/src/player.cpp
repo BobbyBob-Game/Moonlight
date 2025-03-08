@@ -3,6 +3,7 @@
 Player::Player(SDL_Renderer* renderer)
     : texture(nullptr), posX(368), posY(268), velX(0.0f), velY(0.0f),
       currentFrame(0), frameTimer(0.0f), frameDelay(0.1f), numFrames(4) {
+    
     texture = loadTexture(renderer, "assets/Owlboy.png");
     if (!texture) {
         std::cout << "Failed to load player texture!\n";
