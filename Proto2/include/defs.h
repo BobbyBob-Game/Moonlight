@@ -16,5 +16,8 @@
 static const int SCREEN_WIDTH = 1280;
 static const int SCREEN_HEIGHT = 720;
 const int TILE_SIZE = 32; //25x18
+static const int PLAYER_WIDTH = 112;
+static const int PLAYER_HEIGHT = 80;
+
 
 #endif

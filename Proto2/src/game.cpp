@@ -91,6 +91,7 @@ void Game::run() {
 
         // ------ PLAYER ------- //
         player->update(deltaTime);
+        player->updateAnimation(deltaTime);
 
         offset1 -= baseSpeed * 0.2f * deltaTime;
         offset2 -= baseSpeed * 0.5f * deltaTime;

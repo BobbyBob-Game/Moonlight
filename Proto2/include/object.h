@@ -4,7 +4,9 @@
 
 class Object {
     public:
+    SDL_Rect src, dest;
     void setRect(int x, int y);
+    void setSource(int x, int y, int w, int h);
     void render(SDL_Renderer* destination, SDL_Rect* source);
     void render(int x, int y, SDL_Renderer* destination, SDL_Rect* source);
     void clear();
@@ -19,7 +21,6 @@ class Object {
 
     private:
     SDL_Texture* texture;
-    SDL_Rect src, dest;
 };
 
 #endif

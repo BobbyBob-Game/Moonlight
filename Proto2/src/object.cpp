@@ -40,6 +40,13 @@ bool Object::loadText(std::string text, TTF_Font* font, SDL_Color color, SDL_Ren
     return (texture != nullptr);
 }
 
+void Object::setSource(int x, int y, int w, int h) {
+    src.x = x;
+    src.y = y;
+    src.w = w;
+    src.h = h;
+}
+
 void Object::clear(){
     if(texture){
         SDL_DestroyTexture(texture);
