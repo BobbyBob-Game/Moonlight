@@ -2,7 +2,7 @@
 
 Game::Game()
     : gWindow(nullptr), gRenderer(nullptr), gLayer1(nullptr), gLayer2(nullptr), gLayer3(nullptr),
-      offset1(0.0f), offset2(0.0f), offset3(0.0f), player(nullptr), currentMap(nullptr){
+      offset1(0.0f), offset2(0.0f), offset3(0.0f), player(nullptr){
 }
 
 Game::~Game() {
@@ -35,10 +35,23 @@ bool Game::init() {
         std::cout << "SDL_image could not initialize! SDL_image Error: " << IMG_GetError() << "\n";
         return false;
     }
-    currentMap = Map(gRenderer);
-    currentMap.loadTileTexture();
-    currentMap.loadMap("assets/TileMap/chunk1.csv", 40, 22);
-    
+
+    // Create the playable character
+    player = new Player(
+        gRenderer,    // SDL_Renderer*
+        50.0f,        // posX (Starting X position)
+        300.0f,       // posY (Starting Y position)
+        10,            // normalSpeed
+        2,           // dashSpeed
+        0.0f,         // velY
+        false,        // isJumping
+        false,        // isFalling
+        false,        // isWallSliding
+        0,            // dashStartTime
+        0             // dashCooldownTime
+    );
+    levelManager = new LevelManager(gRenderer);
+
     return true;
 }
 
@@ -67,57 +80,101 @@ bool Game::loadMedia() {
         return false;
     }
 
-    // Create the playable character
-    player = new Player(gRenderer);
     return true;
 }
 
-void Game::run() {
-    bool quit = false;
+void Game::input(){
     SDL_Event e;
-    Uint32 lastTime = SDL_GetTicks();
-    
-    while (!quit) {
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) {
-                quit = true;
-            }
-            player->handleEvent(e);
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) {
+            quit = true;
         }
-        
+        player->handleEvent(e);
+    }
+}
+
+void Game::update(float deltaTime) {
+    // Update player
+    player->update(deltaTime);
+    player->updateAnimation(deltaTime);
+
+    // Update background offsets
+    offset1 -= baseSpeed * 0.2f * deltaTime;
+    offset2 -= baseSpeed * 0.5f * deltaTime;
+    offset3 -= baseSpeed * 1.0f * deltaTime;
+    offset4 -= baseSpeed * 1.2f * deltaTime;
+
+    if (offset1 <= -SCREEN_WIDTH) offset1 = 0;
+    if (offset2 <= -SCREEN_WIDTH) offset2 = 0;
+    if (offset3 <= -SCREEN_WIDTH) offset3 = 0;
+    if (offset4 <= -SCREEN_WIDTH) offset4 = 0;
+}
+
+void Game::render() {
+    // Clear screen
+    SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
+    SDL_RenderClear(gRenderer);
+
+    // Render background layers
+    renderBackground(gRenderer, gLayer1, offset1);
+    renderBackground(gRenderer, gLayer2, offset2);
+    renderBackground(gRenderer, gLayer3, offset3);
+    renderBackground(gRenderer, gLayer4, offset4);
+
+    // Render the tile grid (map)
+    std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
+    for (int y = 0; y < grid.size(); y++) {
+        for (int x = 0; x < grid[y].size(); x++) {
+            SDL_Texture* tileTex = levelManager->GetTexture(grid[y][x].type);
+            if (tileTex) {
+                SDL_Rect dstRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                SDL_RenderCopy(gRenderer, tileTex, nullptr, &dstRect);
+            }
+        }
+    }
+    
+    // Render the player
+    player->render(gRenderer);
+
+    // Present the rendered frame
+    SDL_RenderPresent(gRenderer);
+}
+
+void Game::controlFrameRate(Uint32 frameStart, int frameDelay) {
+    int frameTime = SDL_GetTicks() - frameStart;
+    if (frameTime < frameDelay) {
+        SDL_Delay(frameDelay - frameTime);
+    }
+}
+
+void Game::run() {
+    const int FRAME_DELAY = 1000 / 60; // Target 60 FPS
+    Uint32 lastTime = SDL_GetTicks();
+
+    // Load the current level grid once at start
+    levelManager->LoadLevel();
+
+    while (!quit) {
+        Uint32 frameStart = SDL_GetTicks();
+
+        // 1. Process input events.
+        input();
+
+        // 2. Compute delta time.
         Uint32 currentTime = SDL_GetTicks();
         float deltaTime = (currentTime - lastTime) / 1000.0f;
         lastTime = currentTime;
 
-        // ------ PLAYER ------- //
-        player->update(deltaTime);
-        player->updateAnimation(deltaTime);
+        // 3. Update game state.
+        update(deltaTime);
 
-        offset1 -= baseSpeed * 0.2f * deltaTime;
-        offset2 -= baseSpeed * 0.5f * deltaTime;
-        offset3 -= baseSpeed * 1.0f * deltaTime;
-        offset4 -= baseSpeed * 1.2f * deltaTime;
+        // 4. Render current frame.
+        render();
 
-        if (offset1 <= -SCREEN_WIDTH) offset1 = 0;
-        if (offset2 <= -SCREEN_WIDTH) offset2 = 0;
-        if (offset3 <= -SCREEN_WIDTH) offset3 = 0;
-        if (offset4 <= -SCREEN_WIDTH) offset4 = 0;
-
-        SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
-        SDL_RenderClear(gRenderer);
-
-        renderBackground(gRenderer, gLayer1, offset1);
-        renderBackground(gRenderer, gLayer2, offset2);
-        renderBackground(gRenderer, gLayer3, offset3);
-        renderBackground(gRenderer, gLayer4, offset4);
-
-        // ------ MAPS --------//
-        currentMap.drawMap();
-        player->render(gRenderer);
-
-        SDL_RenderPresent(gRenderer);
+        // 5. Frame rate control.
+        controlFrameRate(frameStart, FRAME_DELAY);
     }
-}
+} 
 
 void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX){
     if(gLayerX != nullptr){
