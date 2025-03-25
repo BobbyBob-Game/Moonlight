@@ -15,7 +15,7 @@ bool Game::init() {
         return false;
     }
     
-    gWindow = SDL_CreateWindow("Parallax Scrolling Game",
+    gWindow = SDL_CreateWindow("Moonlight",
                                SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
     if (!gWindow) {
@@ -42,7 +42,7 @@ bool Game::init() {
         50.0f,        // posX (Starting X position)
         300.0f,       // posY (Starting Y position)
         10,            // normalSpeed
-        2,           // dashSpeed
+        20,           // dashSpeed
         0.0f,         // velY
         false,        // isJumping
         false,        // isFalling
@@ -94,9 +94,41 @@ void Game::input(){
 }
 
 void Game::update(float deltaTime) {
-    // Update player
+    bool isVertical = levelManager->isSpecialLevel();
+
+    // Get display size
+    SDL_DisplayMode DM;
+    SDL_GetCurrentDisplayMode(0, &DM);
+    int screenWidth = DM.w;
+    int screenHeight = DM.h;
+
+    int newWidth, newHeight;
+
+    if (isVertical) {
+        newWidth = SCREEN_HEIGHT;
+        newHeight = SCREEN_WIDTH;
+    } else {
+        newWidth = SCREEN_WIDTH;
+        newHeight = SCREEN_HEIGHT;
+    }
+
+    // Resize the window
+    SDL_SetWindowSize(gWindow, newWidth, newHeight);
+
+    // Center the window
+    int newX = (screenWidth - newWidth) / 2;
+    int newY = (screenHeight - newHeight) / 2;
+    SDL_SetWindowPosition(gWindow, newX, newY);
+
+    // Update the player
     player->update(deltaTime);
     player->updateAnimation(deltaTime);
+
+    // Handle level transition
+    if (player->reachedExit()) {
+        levelManager->NextLevel();
+        player->reset();
+    }
 
     // Update background offsets
     offset1 -= baseSpeed * 0.2f * deltaTime;
@@ -104,41 +136,62 @@ void Game::update(float deltaTime) {
     offset3 -= baseSpeed * 1.0f * deltaTime;
     offset4 -= baseSpeed * 1.2f * deltaTime;
 
-    if (offset1 <= -SCREEN_WIDTH) offset1 = 0;
-    if (offset2 <= -SCREEN_WIDTH) offset2 = 0;
-    if (offset3 <= -SCREEN_WIDTH) offset3 = 0;
-    if (offset4 <= -SCREEN_WIDTH) offset4 = 0;
+    if (offset1 <= -newWidth) offset1 = 0;
+    if (offset2 <= -newWidth) offset2 = 0;
+    if (offset3 <= -newWidth) offset3 = 0;
+    if (offset4 <= -newWidth) offset4 = 0;
 }
 
+
 void Game::render() {
-    // Clear screen
     SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
     SDL_RenderClear(gRenderer);
 
-    // Render background layers
-    renderBackground(gRenderer, gLayer1, offset1);
-    renderBackground(gRenderer, gLayer2, offset2);
-    renderBackground(gRenderer, gLayer3, offset3);
-    renderBackground(gRenderer, gLayer4, offset4);
+    bool isVertical = levelManager->isSpecialLevel();
 
-    // Render the tile grid (map)
+    /*if (!isVertical) {
+        // Horizontal scrolling (X-axis)
+        renderBackground(gRenderer, gLayer1, offset1, 0, false);
+        renderBackground(gRenderer, gLayer2, offset2, 0, false);
+        renderBackground(gRenderer, gLayer3, offset3, 0, false);
+        renderBackground(gRenderer, gLayer4, offset4, 0, false);
+    } else {
+        // Vertical scrolling (Y-axis)
+        renderBackground(gRenderer, gLayer1, 0, offset1, true);
+        renderBackground(gRenderer, gLayer2, 0, offset2, true);
+        renderBackground(gRenderer, gLayer3, 0, offset3, true);
+        renderBackground(gRenderer, gLayer4, 0, offset4, true);
+    }*/
+
+    // Render the tile map and player
     std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
     for (int y = 0; y < grid.size(); y++) {
         for (int x = 0; x < grid[y].size(); x++) {
             SDL_Texture* tileTex = levelManager->GetTexture(grid[y][x].type);
             if (tileTex) {
-                SDL_Rect dstRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                SDL_Rect dstRect;
+                if (!isVertical) {
+                    dstRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                } else {
+                    dstRect = { 
+                        static_cast<int>(x * TILE_SIZE), 
+                        static_cast<int>((static_cast<int>(grid.size()) - y - 1) * TILE_SIZE), 
+                        TILE_SIZE, 
+                        TILE_SIZE 
+                    };
+                    
+                }
                 SDL_RenderCopy(gRenderer, tileTex, nullptr, &dstRect);
             }
         }
     }
-    
+
     // Render the player
     player->render(gRenderer);
 
-    // Present the rendered frame
     SDL_RenderPresent(gRenderer);
 }
+
 
 void Game::controlFrameRate(Uint32 frameStart, int frameDelay) {
     int frameTime = SDL_GetTicks() - frameStart;
@@ -176,24 +229,25 @@ void Game::run() {
     }
 } 
 
-void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX){
-    if(gLayerX != nullptr){
-        SDL_Rect bgRect1 = {
-            static_cast<int> (offsetX),
-            0,
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT
-        };
-        SDL_Rect bgRect2 = {
-            static_cast<int> (offsetX + SCREEN_WIDTH),
-            0,
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT
-        };
+void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical){
+    if (gLayerX != nullptr) {
+        SDL_Rect bgRect1, bgRect2;
+
+        if (!isVertical) {
+            // Standard horizontal scrolling
+            bgRect1 = { static_cast<int>(offsetX), 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+            bgRect2 = { static_cast<int>(offsetX + SCREEN_WIDTH), 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+        } else {
+            // Vertical scrolling
+            bgRect1 = { 0, static_cast<int>(offsetY), SCREEN_WIDTH, SCREEN_HEIGHT };
+            bgRect2 = { 0, static_cast<int>(offsetY + SCREEN_HEIGHT), SCREEN_WIDTH, SCREEN_HEIGHT };
+        }
+
         SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect1);
         SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect2);
     }
 }
+
 
 void Game::close() {
 

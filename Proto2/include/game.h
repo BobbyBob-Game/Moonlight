@@ -17,7 +17,7 @@ public:
 
     // Loads media for background and player
     bool loadMedia();
-    void renderBackground(SDL_Renderer* renderer, SDL_Texture *gLayerX, float offsetX);
+    void renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical);
     void fade(int duration);
     void renderLevel();
 

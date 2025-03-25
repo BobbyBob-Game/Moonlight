@@ -91,3 +91,7 @@ SDL_Texture* LevelManager::GetTexture(int tileType) const {
     auto it = textures.find(tileType);
     return (it != textures.end()) ? it->second : nullptr;
 }
+
+bool LevelManager::isSpecialLevel(){
+    return levels[currentLevel] == "assets/TileMap/chunk3.csv";
+}

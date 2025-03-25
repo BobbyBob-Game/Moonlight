@@ -31,7 +31,9 @@ private:
     float velY;
     int SPEED, normalSpeed, dashSpeed;
     bool isJumping, isFalling, isWallSliding;
-    Uint32 dashStartTime, dashCooldownTime;
+    Uint32 dashStartTime = 0, dashCooldownTime = 0;
+    float momentumTimer = 0.0f;
+    int dashDirection = 0;
     
     
     int currentFrame;       // Current frame index in the sprite sheet
@@ -52,10 +54,10 @@ private:
     int begin   = 0;
     bool nAb    = false;
     int newAnim = 0;
-    int walking, idle, dashing;
+    int walking, idle, dashing, jumping;
     float animTimer = 0.0f;
     float frameDelay = 0.1f; 
-    bool left, right, dash;
+    bool left, right, dash, facingLeft;
 };
 
 #endif // PLAYER_H
