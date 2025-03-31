@@ -5,6 +5,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -12,7 +13,6 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
-//Something new
 
 static const int SCREEN_WIDTH = 1280;
 static const int SCREEN_HEIGHT = 720;
@@ -35,5 +35,11 @@ const float GRAVITY = 0.5f*SUBPIXELS_PER_PIXEL;
 const float GRAVITY_UP   = 30.0f;   // Gravity while ascending (lower for a slight float)
 const float GRAVITY_DOWN = 50.0f;
 
+enum GameState {
+    STATE_MENU,
+    STATE_GAME,
+    STATE_END
+};
 
+extern GameState gameState;
 #endif

@@ -1,8 +1,9 @@
 #include "game.h"
 
+GameState gameState = STATE_MENU;
 Game::Game()
     : gWindow(nullptr), gRenderer(nullptr), gLayer1(nullptr), gLayer2(nullptr), gLayer3(nullptr),
-      offset1(0.0f), offset2(0.0f), offset3(0.0f), player(nullptr){
+      offset1(0.0f), offset2(0.0f), offset3(0.0f), offset4(0.0f), player(nullptr), pauseGame(false){
 }
 
 Game::~Game() {
@@ -14,7 +15,11 @@ bool Game::init() {
         std::cout << "SDL could not initialize! SDL Error: " << SDL_GetError() << "\n";
         return false;
     }
-    
+
+    if (TTF_Init() == -1) {
+        printf("SDL_ttf could not initialize! TTF_Error: %s\n", TTF_GetError());
+        return false;
+    }
     gWindow = SDL_CreateWindow("Moonlight",
                                SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
@@ -36,6 +41,24 @@ bool Game::init() {
         return false;
     }
 
+    font = TTF_OpenFont("assets/Font/8bitOperatorPlus8-Regular.ttf", 28);
+    if (!font) {
+        std::cerr << "Failed to load font! Error: " << TTF_GetError() << "\n";
+        return false;
+    }
+
+    menu.setBackground("assets/1.png", gRenderer);
+    start_button = menu.createWidget(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 100, 16, "Start");
+    exit_button = menu.createWidget(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 100, 16, "Quit");
+    menu.setButtonTexture(start_button, "assets/Buttons/button.png", gRenderer);
+    menu.setButtonTexture(exit_button,  "assets/Buttons/button.png", gRenderer);
+    menu.loadArrow("assets/Buttons/select_button.png", gRenderer);    
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std::cout << "SDL_mixer could not initialize! SDL_mixer Error: " << Mix_GetError() << "\n";
+        return false;
+    }
+
     // Create the playable character
     player = new Player(
         gRenderer,    // SDL_Renderer*
@@ -50,6 +73,16 @@ bool Game::init() {
         0,            // dashStartTime
         0             // dashCooldownTime
     );
+
+    if (!player->loadSound()){
+        std::cerr << "Failed to load player sound effects!\n";
+        return false;
+    }
+
+    if (!loadMedia()) {
+        std::cerr << "Failed to load background textures!\n";
+        return false;
+    }
     levelManager = new LevelManager(gRenderer);
 
     return true;
@@ -83,17 +116,33 @@ bool Game::loadMedia() {
     return true;
 }
 
-void Game::input(){
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) {
+void Game::input() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
             quit = true;
         }
-        player->handleEvent(e);
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+            pauseGame = !pauseGame;  
+            std::cout << (pauseGame ? "Game Paused\n" : "Game Resumed\n");
+            if(pauseGame && player){
+                player->stopMovement();
+            }
+        }
+
+        if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r){
+            if(player){
+                player->reset(false, levelManager->getCurrentLevel());
+            }
+        }
+        if (!pauseGame && player) { 
+            player->handleEvent(event, pauseGame);
+        }
     }
 }
 
 void Game::update(float deltaTime) {
+    if(pauseGame) return;
     bool isVertical = levelManager->isSpecialLevel();
 
     // Get display size
@@ -121,13 +170,15 @@ void Game::update(float deltaTime) {
     SDL_SetWindowPosition(gWindow, newX, newY);
 
     // Update the player
-    player->update(deltaTime);
+    player->update(deltaTime, pauseGame);
     player->updateAnimation(deltaTime);
+    levelManager->updateCheckpoint(deltaTime, *player);
 
     // Handle level transition
     if (player->reachedExit()) {
+        levelManager->fade(gRenderer, 500, false);
         levelManager->NextLevel();
-        player->reset();
+        player->reset(true, levelManager->getCurrentLevel());
     }
 
     // Update background offsets
@@ -146,6 +197,10 @@ void Game::update(float deltaTime) {
 void Game::render() {
     SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
     SDL_RenderClear(gRenderer);
+    if(gameState == STATE_MENU){
+        menu.renderBackground(gRenderer);
+        //return; not yet 
+    }
 
     bool isVertical = levelManager->isSpecialLevel();
 
@@ -185,11 +240,10 @@ void Game::render() {
             }
         }
     }
-
+    // render checkpoints
+    levelManager->renderCheckpoint(gRenderer);
     // Render the player
     player->render(gRenderer);
-
-    SDL_RenderPresent(gRenderer);
 }
 
 
@@ -200,34 +254,32 @@ void Game::controlFrameRate(Uint32 frameStart, int frameDelay) {
     }
 }
 
-void Game::run() {
-    const int FRAME_DELAY = 1000 / 60; // Target 60 FPS
-    Uint32 lastTime = SDL_GetTicks();
 
-    // Load the current level grid once at start
+void Game::run() {
+    const int FRAME_DELAY = 1000 / 60; // 60 FPS
+    Uint32 lastTime = SDL_GetTicks();
     levelManager->LoadLevel();
+    levelManager->loadCheckPoint(levelManager->getCurrentLevel());
 
     while (!quit) {
+        input();  
         Uint32 frameStart = SDL_GetTicks();
-
-        // 1. Process input events.
-        input();
-
-        // 2. Compute delta time.
         Uint32 currentTime = SDL_GetTicks();
         float deltaTime = (currentTime - lastTime) / 1000.0f;
         lastTime = currentTime;
 
-        // 3. Update game state.
-        update(deltaTime);
-
-        // 4. Render current frame.
-        render();
-
-        // 5. Frame rate control.
+        if (!pauseGame) {
+            update(deltaTime);  
+            render();           
+        }
+        else {
+            renderPauseMenu(gRenderer);
+        }
         controlFrameRate(frameStart, FRAME_DELAY);
+        SDL_RenderPresent(gRenderer);
     }
-} 
+}
+
 
 void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical){
     if (gLayerX != nullptr) {
@@ -247,7 +299,6 @@ void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float 
         SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect2);
     }
 }
-
 
 void Game::close() {
 
@@ -269,4 +320,16 @@ void Game::close() {
     
     IMG_Quit();
     SDL_Quit();
+}
+
+void Game::renderPauseMenu(SDL_Renderer* renderer){
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderClear(renderer);
+    SDL_Rect overlay = {0,0,SCREEN_WIDTH, SCREEN_HEIGHT};
+    SDL_RenderFillRect(renderer, &overlay);
+
+    SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+    SDL_Rect pauseBox = {SCREEN_WIDTH / 4, SCREEN_HEIGHT / 4, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2};
+    SDL_RenderFillRect(renderer, &pauseBox);
+
 }

@@ -1,11 +1,10 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 #include "player.h"
 #include "defs.h"
 #include "levelman.h"
+#include "widget.h"
 
 class Game {
 public:
@@ -20,6 +19,7 @@ public:
     void renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical);
     void fade(int duration);
     void renderLevel();
+    void renderPauseMenu(SDL_Renderer* renderer);
 
     // Main game loop
     void run();
@@ -27,6 +27,7 @@ public:
     void update(float deltaTime);
     void render();
     void controlFrameRate(Uint32 frameStart, int frameDelay);
+    void handleEventPause();
 
     // Frees media and shuts down SDL
     void close();
@@ -36,6 +37,7 @@ public:
 
 private:
     bool quit = false;
+    bool pauseGame = false;
     LevelManager* levelManager;
     SDL_Window* gWindow;
     SDL_Renderer* gRenderer;
@@ -57,6 +59,11 @@ private:
 
     // The playable character
     Player* player;
+
+    Widget menu; //Widget-related here:
+    int start_button, exit_button;
+
+    TTF_Font *font;
 
     // Helper: Load a texture from file
     SDL_Texture* loadTexture(const std::string &path);
