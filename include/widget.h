@@ -12,11 +12,13 @@ class Widget : public Object {
     Object arrow; 
     Object background;
     float backgroundX = 0;
+    Mix_Chunk* buttonSound = nullptr;
+    Mix_Chunk* selectSound = nullptr;
 
     public:
     struct button {
         SDL_Rect rect;
-        std::string label; //text displaying   
+        std::string label; 
         Object image; 
     };
     
@@ -30,6 +32,7 @@ class Widget : public Object {
     void setBackground(const std::string& filename, SDL_Renderer* renderer);
     void updateBackground(float dt);
     void renderBackground(SDL_Renderer* renderer);
+    bool loadSound();
 };
 
 

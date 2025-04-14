@@ -15,19 +15,39 @@ void Widget::updateWidget(SDL_Event& event, GameState& gameState) {
                 if (curWid < buttons.size() - 1) {
                     curWid++;
                 }
+                Mix_PlayChannel(-1, selectSound, 0);
                 break;
             case SDLK_UP:
                 if (curWid > 0) {
                     curWid--;
                 }
+                Mix_PlayChannel(-1, selectSound, 0);
                 break;
             case SDLK_RETURN:
                 std::cout << "Button pressed: " << buttons[curWid].label << "\n";
-                if(buttons[curWid].label == "Start a new game"){
+                Mix_PlayChannel(-1, buttonSound, 0);
+                if(buttons[curWid].label == "Start"){
                     gameState = STATE_GAME;
                 }
-                else if(buttons[curWid].label == "Exit ..."){
+                else if(buttons[curWid].label == "Settings"){
+                    prevState = gameState;
+                    gameState = STATE_SETTINGS;
+                }
+                else if(buttons[curWid].label == "Quit"){
                     gameState = STATE_END;
+                }
+                else if(buttons[curWid].label == "Back"){
+                    gameState = prevState;
+                }
+                else if(buttons[curWid].label == "Continue"){
+                    gameState = STATE_GAME;
+                }
+                else if(buttons[curWid].label == "Music"){
+                    if(Mix_PausedMusic()){
+                        Mix_ResumeMusic();
+                    } else {
+                        Mix_PauseMusic();
+                    }
                 }
                 break;
         }
@@ -37,15 +57,9 @@ void Widget::updateWidget(SDL_Event& event, GameState& gameState) {
 void Widget::button_render(SDL_Renderer* renderer, TTF_Font *font) {
     for (const auto& button : buttons) {
         if (button.image.getTex()) {
-            // Render button with image
             SDL_RenderCopy(renderer, button.image.getTex(), NULL, &button.rect);
-        } else {
-            // Render default gray rectangle if no texture is set
-            SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-            SDL_RenderFillRect(renderer, &button.rect);
         }
 
-        // Render button text
         SDL_Color textColor = {255, 255, 255, 255};
         SDL_Surface* textSurf = TTF_RenderText_Solid(font, button.label.c_str(), textColor);
         SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurf);
@@ -112,3 +126,26 @@ void Widget::renderBackground(SDL_Renderer* renderer){
         SDL_RenderCopy(renderer, background.getTex(), NULL, &bgRect2);
     }
 }
+
+bool Widget::loadSound(){
+    bool success = true;
+    buttonSound = Mix_LoadWAV("assets/sound/buttonSound.wav");
+    if (!buttonSound) {
+        std::cerr << "Failed to load button sound: " << Mix_GetError() << '\n';
+        success = false;
+    } else {
+        Mix_VolumeChunk(buttonSound, MIX_MAX_VOLUME); 
+    }
+
+    selectSound = Mix_LoadWAV("assets/sound/selecting.wav");
+    if(!selectSound){
+        std::cerr << "Failed to load select sound: " << Mix_GetError() << "\n";
+        success = false;
+    }
+    else{
+        Mix_VolumeChunk(selectSound, MIX_MAX_VOLUME);
+    }
+
+    return success;
+}
+

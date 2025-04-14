@@ -8,41 +8,37 @@ struct Tile {
     int type;    
 };
 
-struct Checkpoint {
-    int x, y; 
-    bool activated = false;
+struct LevelInfo {
+    std::string layoutFile;
+    std::string tilesetFolder;
 };
 
 class LevelManager {
 private:
+    SDL_Renderer* renderer;
+    SDL_Window* window; 
     int currentLevel;
-    std::vector<std::string> levels;
-    std::vector<std::vector<Tile>> levelData;  // 2D grid storing tile types
-    std::unordered_map<int, SDL_Texture*> textures;  // Map tile types to textures
+    std::vector<LevelInfo> levels;
+    std::vector<std::vector<Tile>> levelData;  
+    std::unordered_map<int, SDL_Texture*> textures; 
     
 public:
-    LevelManager(SDL_Renderer* renderer);
+    LevelManager(SDL_Renderer* renderer, SDL_Window* window);
     ~LevelManager();
 
     void LoadLevel();
     void NextLevel();
+    void reset();
     bool isSpecialLevel();
-    void fade(SDL_Renderer* renderer, int duration, bool fadeIn);
     int getCurrentLevel() {return currentLevel;}
 
-    std::vector<Checkpoint> checkpoints;
-    void loadCheckPoint(int levelNumber);
-    void renderCheckpoint(SDL_Renderer* renderer);
-    void updateCheckpoint(float deltaTime, Player& player);
+    static bool isSolid(int tileType, int levelNumber);
 
-    std::vector<Checkpoint>& getCheckPoints() {return checkpoints;}
+    void renderText(const std::string& text, TTF_Font* font, SDL_Rect position, SDL_Color color);
+
     std::vector<std::vector<Tile>> GetLevelData() const;
+    std::string getLevelCSV();
     SDL_Texture* GetTexture(int tileType) const;
-
-    SDL_Texture* checkpointTexture = nullptr;
-    int checkpointFrame = 0;
-    float checkpointAnimTimer = 0.0f;
-    float checkpointFrameDelay = 0.2f;
 };
 
-#endif // LEVELMAN_H
+#endif 

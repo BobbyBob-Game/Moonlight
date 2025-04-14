@@ -23,24 +23,4 @@ class Object {
     SDL_Texture* texture;
 };
 
-class AnimatedObject : public Object { // this will be for small animation, the player animation is used by a different algorithm as it's easier to understand -Bach- 
-    private:
-    SDL_Rect src;         
-    SDL_Rect dest;        
-    SDL_Texture* text;    
-    int mFrameCount;      
-    int mFrameWidth;      
-    int mFrameHeight;     
-    Uint32 mFrameDelay;   
-    int mCurrentFrame;    
-    Uint32 mLastFrameTime;
-
-    public:
-    AnimatedObject(SDL_Renderer*& renderer, const std::string& filename, int frameCount, int frameWidth, int frameHeight, Uint32 frameDelay);
-    ~AnimatedObject();
-    void draw(int x, int y, int w, int h);
-    void update();
-    void render(SDL_Renderer*& renderer);
-};
-
 #endif

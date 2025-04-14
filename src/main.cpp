@@ -5,9 +5,6 @@ int main(int argc, char* args[]) {
     if (!game.init()) {
         return -1;
     }
-    if (!game.loadMedia()) {
-        return -1;
-    }
     
     game.run();
     game.close();

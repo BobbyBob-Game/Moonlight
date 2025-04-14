@@ -5,21 +5,14 @@
 #include "defs.h"
 #include "levelman.h"
 #include "widget.h"
+#include "seeker.h"
+#include "dialogue.h"
 
 class Game {
 public:
     Game();
     ~Game();
-
-    // Initializes SDL, window, renderer, etc.
     bool init();
-
-    // Loads media for background and player
-    bool loadMedia();
-    void renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical);
-    void fade(int duration);
-    void renderLevel();
-    void renderPauseMenu(SDL_Renderer* renderer);
 
     // Main game loop
     void run();
@@ -29,47 +22,48 @@ public:
     void controlFrameRate(Uint32 frameStart, int frameDelay);
     void handleEventPause();
 
-    // Frees media and shuts down SDL
     void close();
-
-    // Get the renderer (for use in other classes)
+    void thegreatReset();
     SDL_Renderer* getRenderer() const { return gRenderer; }
 
 private:
     bool quit = false;
     bool pauseGame = false;
+    bool hasTrigger = false; //for dialogue
+    bool hasFirstDialogue = false;
+    bool hasSecondDialogue = false;
+    Uint32 deathTimer = 0;
+    bool waitKey = false;
+
     LevelManager* levelManager;
     SDL_Window* gWindow;
     SDL_Renderer* gRenderer;
 
-    // Background textures for parallax
-    SDL_Texture* gLayer1;
-    SDL_Texture* gLayer2;
-    SDL_Texture* gLayer3;
-    SDL_Texture* gLayer4;
-
-    // Offsets for parallax scrolling
-    float offset1;
-    float offset2;
-    float offset3;
-    float offset4;  
-
-    // Base speed for scrolling
-    const float baseSpeed = 100.0f;
-
     // The playable character
     Player* player;
+    Seeker* seeker;
+    DialogueManager dialogue;
 
-    Widget menu; //Widget-related here:
-    int start_button, exit_button;
+    Widget menu; 
+    Widget settingsMenu;
+    Widget pauseMenu;
+
+    SDL_Texture* far;
+    SDL_Texture* mid;
+    SDL_Texture* mid_near;
+    SDL_Texture* near;
+
+    int continueButton, quitButton, settings;
+    int volumeButton, musicButton, backButton;
+    int start_button, settings_button, exit_button;
+
+    Mix_Music* music = nullptr;
 
     TTF_Font *font;
-
-    // Helper: Load a texture from file
     SDL_Texture* loadTexture(const std::string &path);
 };
 
 extern Uint32 lastTime;
 extern float deltaTime;
 
-#endif // GAME_H
+#endif 

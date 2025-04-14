@@ -1,6 +1,0 @@
-PROBELMS:
-    JUMPING: the jump is only valid when player hit the ground
-
-TODO:
-    WIDGET: make a widget starting screen
-    

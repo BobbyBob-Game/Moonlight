@@ -1,66 +1,50 @@
 #include "levelman.h"
 #include "player.h"
 
-// Constructor initializes levels and loads textures
-LevelManager::LevelManager(SDL_Renderer* renderer) : currentLevel(0) {
+LevelManager::LevelManager(SDL_Renderer* renderer, SDL_Window* window) : currentLevel(0) {
+    this->renderer = renderer; //same name so use this
+    this->window = window;
     levels = {
-        "assets/TileMap/chunk1.csv",
-        "assets/TileMap/chunk2.csv",
-        "assets/TileMap/chunk3_pre.csv", "assets/TileMap/chunk3.csv",
-        "assets/TileMap/chunk4_ice.csv"
+        {"assets/TileMap/tutorial.csv", "assets/TileMap/tileset/Village_prop/Ground"},
+        {"assets/TileMap/level1.csv", "assets/TileMap/tileset/Level1"},
+        {"assets/TileMap/level2.csv", "assets/TileMap/tileset/Level2"},
+        {"assets/TileMap/level3_pre.csv", "assets/TileMap/tileset/Level3"}, {"assets/TileMap/level3.csv", "assets/TileMap/tileset/Level3"},
+        {"assets/TileMap/ending_layer1.csv", "assets/TileMap/tileset/Village_prop/Ground"}
     };
 
-    // Load textures for each tile type
-    textures[6] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile6.png"); 
-    textures[7] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile7.png"); 
-    textures[8] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile8.png"); 
-    textures[12] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile12.png"); 
-    textures[13] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile13.png"); 
-    textures[14] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile14.png"); 
-    textures[18] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile18.png"); 
-    textures[19] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile19.png"); 
-    textures[20] = IMG_LoadTexture(renderer, "assets/TileMap/tileset/structTile20.png"); 
-
-    for (const auto& [key, texture] : textures) {
-        if (!texture) {
-            std::cerr << "Failed to load texture for tile " << key << ": " << IMG_GetError() << "\n";
-        }
-    }
-
-    checkpointTexture = IMG_LoadTexture(renderer, "assets/doge.png");
-    if (!checkpointTexture) {
-        std::cerr << "Failed to load checkpoint texture: " << IMG_GetError() << "\n";
-    }
 }
 
-// Destructor to free textures
 LevelManager::~LevelManager() {
     for (auto& [key, texture] : textures) {
-        if (texture) {
-            SDL_DestroyTexture(texture);
-        }
+        if (texture) SDL_DestroyTexture(texture);
     }
+    textures.clear();
 }
 
-// Load current level from CSV
 void LevelManager::LoadLevel() {
-    if (currentLevel >= levels.size()) {
-        std::cout << "Game Over! Restarting...\n";
-        currentLevel = 0;
+    levelData.clear();
+    for (auto& pair : textures) {
+        SDL_DestroyTexture(pair.second);
     }
+    textures.clear();
 
-    std::cout << "Loading: " << levels[currentLevel] << "...\n";
-    std::cout << "The player is in: " << currentLevel << "...\n";
+    const LevelInfo& levelInfo = levels[currentLevel];
 
-    std::ifstream file(levels[currentLevel]);
+    if (levelInfo.layoutFile == "assets/TileMap/level3.csv") {
+        SDL_SetWindowSize(window, PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
+        SDL_RenderSetLogicalSize(renderer, LANDSCAPE_HEIGHT, LANDSCAPE_WIDTH); 
+    } else {
+        SDL_SetWindowSize(window, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
+        SDL_RenderSetLogicalSize(renderer, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
+    }    
+
+    std::ifstream file(levelInfo.layoutFile);
     if (!file.is_open()) {
-        std::cerr << "Error loading level file: " << levels[currentLevel] << "\n";
+        std::cerr << "Error loading level file: " << levelInfo.layoutFile << "\n";
         return;
     }
 
-    levelData.clear();
     std::string line;
-
     while (std::getline(file, line)) {
         std::vector<Tile> row;
         std::stringstream ss(line);
@@ -71,15 +55,30 @@ void LevelManager::LoadLevel() {
             tile.type = std::stoi(tileValue);
             row.push_back(tile);
         }
-
         levelData.push_back(row);
     }
-
     file.close();
-    loadCheckPoint(currentLevel);
+
+    std::set<int> uniqueTileTypes;
+    for (const auto& row : levelData) {
+        for (const auto& tile : row) {
+            uniqueTileTypes.insert(tile.type);
+        }
+    }
+
+    for (int tileType : uniqueTileTypes) {
+        if(tileType == -1) continue;
+        std::string path = levelInfo.tilesetFolder + "/tile" + std::to_string(tileType) + ".png";
+        SDL_Texture* tex = IMG_LoadTexture(renderer, path.c_str());
+        if (!tex) {
+            std::cerr << "Failed to load tile texture: " << path << " - " << IMG_GetError() << "\n";
+        } else {
+            textures[tileType] = tex;
+        }
+    }
+
 }
 
-// Move to the next level
 void LevelManager::NextLevel() {
     if (currentLevel < levels.size() - 1) {
         currentLevel++;
@@ -87,69 +86,70 @@ void LevelManager::NextLevel() {
     }
 }
 
-// Get the level data grid
 std::vector<std::vector<Tile>> LevelManager::GetLevelData() const {
     return levelData;
 }
 
-// Get the texture for a given tile type
 SDL_Texture* LevelManager::GetTexture(int tileType) const {
     auto it = textures.find(tileType);
     return (it != textures.end()) ? it->second : nullptr;
 }
 
 bool LevelManager::isSpecialLevel(){
-    return levels[currentLevel] == "assets/TileMap/chunk3.csv";
+    return levels[currentLevel].layoutFile == "assets/TileMap/level3.csv";
 }
 
-void LevelManager::fade(SDL_Renderer *renderer, int duration, bool fadeIn) {
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND); // Enable alpha blending
-
-    int startAlpha = fadeIn ? 255 : 0;
-    int endAlpha = fadeIn ? 0 : 255;
-    int step = (endAlpha - startAlpha) / (duration / 10); // Auto-adjust step size
-
-    SDL_Rect screen = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-
-    for (int alpha = startAlpha; (fadeIn ? alpha >= endAlpha : alpha <= endAlpha); alpha += step) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
-        SDL_RenderFillRect(renderer, &screen);
-        SDL_RenderPresent(renderer);
-        SDL_Delay(10); // Small delay for smooth effect
+bool LevelManager::isSolid(int tileType, int levelNumber){
+    if(levelNumber == 0 || levelNumber == 5){
+        return (tileType == 0 || tileType == 1 || tileType == 2 || tileType == 224 || tileType == 225 || tileType == 226);
     }
-}
-
-void LevelManager::loadCheckPoint(int levelNumber){
-    checkpoints.clear();
-    if(levelNumber == 1){
-        checkpoints.push_back({SCREEN_WIDTH/2,SCREEN_HEIGHT - 64,false});
+    else if(levelNumber == 1){
+        return (tileType == 0 || tileType == 1 || tileType == 2 || tileType == 6 || tileType == 7 || tileType == 8 || tileType == 12 || tileType == 14 || tileType == 18 || tileType == 19 ||tileType == 20);
     }
     else if(levelNumber == 2){
-        checkpoints.push_back({SCREEN_WIDTH/2,SCREEN_HEIGHT - 64,false});
+        return (tileType == 6 || tileType == 7 || tileType == 8);
+    }
+    else{
+        return (tileType == 0 || tileType == 1 || tileType == 2 || tileType == 3);
     }
 }
 
-void LevelManager::updateCheckpoint(float deltaTime, Player& player){
-    for(auto& checkpoint : checkpoints){
-        if(checkpoint.activated == false && player.getX() > checkpoint.x - 10){
-                checkpoint.activated = true;
-                player.setCheckpoint(checkpoint.x, checkpoint.y);
-                std::cout << "Checkpoint activated at: " << checkpoint.x << ", " << checkpoint.y << "\n";
-        }
-    }
+std::string LevelManager::getLevelCSV(){
+    return levels[currentLevel].layoutFile;
 }
 
-void LevelManager::renderCheckpoint(SDL_Renderer* renderer){
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    
-    for (auto& checkpoint : checkpoints) {
-        SDL_Rect destRect = {checkpoint.x, checkpoint.y, 32, 32};
-        SDL_RenderFillRect(renderer, &destRect);  // Draw the green rectangle
+void LevelManager::renderText(const std::string& text, TTF_Font* font, SDL_Rect position, SDL_Color color) {
+    if (text.empty() || !font || !renderer) return;
 
-        if (checkpointTexture) {  // Check if the texture is valid
-            SDL_RenderCopy(renderer, checkpointTexture, nullptr, &destRect);
-        } else {
-            std::cerr << "Checkpoint texture is NULL\n";
-        }
+    SDL_Color textColor = {255, 255, 255, 255};
+    SDL_Surface* textSurface = TTF_RenderText_Blended(font, text.c_str(), textColor);
+    if (!textSurface) return;
+
+    SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+    if (!textTexture) {
+        SDL_FreeSurface(textSurface);
+        return;
     }
+
+    int textW = textSurface->w;
+    int textH = textSurface->h;
+    SDL_FreeSurface(textSurface);
+
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a); 
+    SDL_RenderFillRect(renderer, &position);
+
+    SDL_Rect textRect = {
+        position.x + (position.w - textW) / 2,
+        position.y + (position.h - textH) / 2,
+        textW,
+        textH
+    };
+
+    SDL_RenderCopy(renderer, textTexture, nullptr, &textRect);
+    SDL_DestroyTexture(textTexture);
+}
+
+void LevelManager::reset(){
+    currentLevel = 0;
+    LoadLevel();
 }

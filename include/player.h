@@ -7,23 +7,25 @@
 class Player : public Object {
 public:
     int levelStartX, levelStartY;
-    Player(SDL_Renderer* renderer, float posX, float posY, int normalSpeed, int dashSpeed, float velY, bool isJumping, bool isFalling, bool isWallSliding, Uint32 dashStartTime, Uint32 dashCooldownTime);
+    Player(SDL_Renderer* renderer, float posX, float posY, int normalSpeed, int dashSpeed, float velY, bool isJumping, bool isFalling, Uint32 dashStartTime, Uint32 dashCooldownTime);
     ~Player();
     
     void handleEvent(const SDL_Event& e, bool pauseGame);
     int createCycle(int r, int w, int h, int amount, int speed);
     void setCurrentAnimation(int c) {begin = 0; curAnim = c;}
-    void update(float deltaTime, bool pauseGame);
+    void update(float deltaTime, bool pauseGame, bool special, const std::vector<std::vector<Tile>>& levelData, int currentLevel);
     void updateAnimation(float deltaTime);
     void render(SDL_Renderer* renderer);
     float getX() {return posX;}
     float getY() {return posY;}
-    bool reachedExit() {return posX >= SCREEN_WIDTH - PLAYER_WIDTH;}
-    void reset(bool hadActivated, int level);
+    bool reachedExit(bool special, int levelNum);
+    void reset(int level);
     bool loadSound();
     void stopMovement();
     void updateRenderBox();
-    void setCheckpoint(int posXofCheckpoint, int posYofCheckpoint);
+    bool checkTileCollision(const SDL_Rect& rect, const std::vector<std::vector<Tile>>& levelData, int levelNumber);
+    bool isDead(int levelNum) const;
+    void flashLight(SDL_Renderer* renderer, int centerX, int centerY, int radius, int screenW, int screenH, bool isOn);
 
     SDL_Rect getRect() const;
     
@@ -31,31 +33,30 @@ private:
     Mix_Chunk* walkSound = nullptr;
     Mix_Chunk* jumpSound = nullptr;
     Mix_Chunk* dashSound = nullptr;
-    Mix_Music* music = nullptr;
     Uint32 lastWalkSound;
     SDL_Texture* texture;
     SDL_Rect collisionBox;
     SDL_Rect renderBox;
     int collisionWidth = 40;
-    int collisionHeight = 60;
+    int collisionHeight = 50;
     bool reachedCheckpoint;
-    
+    float jumpHoldTIme = 0.0f;
+    bool jumpHold = false;
+
     float posX;
     float posY;
     float velX;
     float velY;
-    int checkpointX, checkpointY;
     
     int SPEED, normalSpeed, dashSpeed;
-    bool isJumping, isFalling, isWallSliding;
+    bool isJumping, isFalling;
     Uint32 dashStartTime = 0, dashCooldownTime = 0;
     float momentumTimer = 0.0f;
     int dashDirection = 0;
     
-    
-    int currentFrame;       // Current frame index in the sprite sheet
-    float frameTimer;       // Accumulated time for frame switching
-    int numFrames;          // Total number of animation frames
+    int currentFrame;      
+    float frameTimer;     
+    int numFrames;   
     
     SDL_Texture* loadTexture(SDL_Renderer* renderer, const std::string &path);
     struct cycle {
@@ -78,4 +79,4 @@ private:
     bool left, right, dash, facingLeft;
 };
 
-#endif // PLAYER_H
+#endif 

@@ -1,0 +1,34 @@
+[33m063fc02[m[33m ([m[1;31morigin/main[m[33m)[m Done fixing player movement
+[33ma6887d1[m testing from lap
+[33m52cdf05[m IMplemented wall slide and wall jump successfully, next: fix dashing
+[33mcc318be[m add basic animations, next: make inf map
+[33m68964d4[m Main game is coming -Bob
+[33mcdce795[m Final prototype before making the actual game
+[33md991ad4[m Create placeholder
+[33m0b6246d[m Before experiment comes
+[33m0237825[m Added jumping, and fix map collision, next: fix map collision and add more maps and game mechanics
+[33m0c3b3d5[m Fix horizontal movement, next: add jumping, fix jumping and add dash + complete game main mechanics
+[33m42260a3[m Begining of the main game mechanics, next: add physics and finish the mechanics, make another level
+[33mf637bec[m Add a testing dialogue, next fix physics and implement the great idea
+[33me5b2137[m Add tiled map, and scale, next create more maps and fix player physics + create enemies or obs
+[33mdfdcd54[m Made widget functional, add scrolling background for menu, next: make map
+[33md946d34[m Add buttons, widget, created a non functional menu, next: make the menu functional
+[33md40db27[m Jumping mechanics, next: menu widget
+[33m066ed54[m Prototype1 of official project
+[33mc9a2a12[m Create placeholder
+[33m44aff28[m Update README.md
+[33m4706940[m Stimulate taking damage when colliding with an obj + created an entity class
+[33mfa8ac0d[m Create an entity class
+[33m06a0835[m Add background sound, Detect collision and make entity move
+[33m8450aab[m Music background - Havent config
+[33m3bc3fe1[m Learnt to Animate sprite, make platform texture, and reorganize files for better comprehension
+[33m0dca14b[m Create placeholder
+[33m6df79c0[m RE-Upload
+[33m8e71098[m MEDIA for games
+[33me7415ef[m Create placeholder
+[33ma32e4ce[m Linux main.cpp (20:54 - 9/2/25)
+[33mb349f31[m Change window size for better 2D platformer game
+[33m92fcc66[m Update graphic.h for better understanding
+[33ma45c7d3[m Windows | Day 1 (9/2/25)
+[33m03d3742[m Create placeholder
+[33mfa5d8e2[m Initial commit

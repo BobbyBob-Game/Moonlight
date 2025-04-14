@@ -1,9 +1,10 @@
 #include "game.h"
 
 GameState gameState = STATE_MENU;
+GameState prevState;
+
 Game::Game()
-    : gWindow(nullptr), gRenderer(nullptr), gLayer1(nullptr), gLayer2(nullptr), gLayer3(nullptr),
-      offset1(0.0f), offset2(0.0f), offset3(0.0f), offset4(0.0f), player(nullptr), pauseGame(false){
+    : gWindow(nullptr), gRenderer(nullptr), player(nullptr), pauseGame(false){
 }
 
 Game::~Game() {
@@ -47,10 +48,31 @@ bool Game::init() {
         return false;
     }
 
+    settingsMenu.setBackground("assets/1.png", gRenderer);
+    int musicButton = settingsMenu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 35, 288, 64, "Music");
+    int backButton = settingsMenu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 + 35, 288, 64, "Back");
+
+    settingsMenu.setButtonTexture(musicButton, "assets/Buttons/button.png", gRenderer);
+    settingsMenu.setButtonTexture(backButton, "assets/Buttons/button.png", gRenderer);
+    settingsMenu.loadArrow("assets/Buttons/select_button.png", gRenderer);
+
+    pauseMenu.setBackground("assets/1.png", gRenderer);
+    int continueButton = pauseMenu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 70, 288, 64, "Continue");
+    int settings = pauseMenu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2, 288, 64, "Settings");
+    int quitButton = pauseMenu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 + 70, 288, 64, "Quit");
+
+    pauseMenu.setButtonTexture(continueButton, "assets/Buttons/button.png", gRenderer);
+    pauseMenu.setButtonTexture(settings, "assets/Buttons/button.png", gRenderer);
+    pauseMenu.setButtonTexture(quitButton, "assets/Buttons/button.png", gRenderer);
+    pauseMenu.loadArrow("assets/Buttons/select_button.png", gRenderer);
+
     menu.setBackground("assets/1.png", gRenderer);
-    start_button = menu.createWidget(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 100, 16, "Start");
-    exit_button = menu.createWidget(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 100, 16, "Quit");
+    start_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 - 70, 288, 64, "Start");
+    settings_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2, 288, 64, "Settings");
+    exit_button = menu.createWidget(SCREEN_WIDTH / 2 - 140, SCREEN_HEIGHT / 2 + 70, 288, 64, "Quit");
+    
     menu.setButtonTexture(start_button, "assets/Buttons/button.png", gRenderer);
+    menu.setButtonTexture(settings_button,  "assets/Buttons/button.png", gRenderer);
     menu.setButtonTexture(exit_button,  "assets/Buttons/button.png", gRenderer);
     menu.loadArrow("assets/Buttons/select_button.png", gRenderer);    
 
@@ -59,17 +81,20 @@ bool Game::init() {
         return false;
     }
 
-    // Create the playable character
+    if(!menu.loadSound() || !settingsMenu.loadSound() || !pauseMenu.loadSound()){
+        std::cerr << "Failed to load player sound effects!\n";
+        return false;
+    }
+
     player = new Player(
-        gRenderer,    // SDL_Renderer*
+        gRenderer,    
         50.0f,        // posX (Starting X position)
         300.0f,       // posY (Starting Y position)
-        10,            // normalSpeed
-        20,           // dashSpeed
+        6,            // normalSpeed
+        10,           // dashSpeed
         0.0f,         // velY
         false,        // isJumping
         false,        // isFalling
-        false,        // isWallSliding
         0,            // dashStartTime
         0             // dashCooldownTime
     );
@@ -79,11 +104,22 @@ bool Game::init() {
         return false;
     }
 
-    if (!loadMedia()) {
-        std::cerr << "Failed to load background textures!\n";
+    levelManager = new LevelManager(gRenderer, gWindow);
+    seeker = new Seeker(gRenderer, levelManager);
+    seeker->loadTexture("assets/seeker.png");
+    seeker->loadCoinTexture("assets/coin.png");
+    seeker->spawnCoin(5);
+
+    far = loadTexture("assets/parallax/layer1.png");
+    mid = loadTexture("assets/parallax/layer2.png");
+    mid_near = loadTexture("assets/parallax/layer3.png");
+    near = loadTexture("assets/parallax/layer4.png");
+
+    music = Mix_LoadMUS("assets/sound/vanishinghope.wav");
+    if (!music) {
+        std::cerr << "Failed to load music: " << Mix_GetError() << '\n';
         return false;
     }
-    levelManager = new LevelManager(gRenderer);
 
     return true;
 }
@@ -103,149 +139,270 @@ SDL_Texture* Game::loadTexture(const std::string &path) {
     return newTexture;
 }
 
-bool Game::loadMedia() {
-    gLayer1 = loadTexture("assets/parallax/layer1.png");
-    gLayer2 = loadTexture("assets/parallax/layer2.png");
-    gLayer3 = loadTexture("assets/parallax/layer3.png");
-    gLayer4 = loadTexture("assets/parallax/layer4.png");
-    
-    if (!gLayer1 || !gLayer2 || !gLayer3 || !gLayer4) {
-        return false;
-    }
-
-    return true;
-}
-
 void Game::input() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
             quit = true;
         }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-            pauseGame = !pauseGame;  
-            std::cout << (pauseGame ? "Game Paused\n" : "Game Resumed\n");
-            if(pauseGame && player){
-                player->stopMovement();
+        if (gameState == STATE_MENU) {
+            menu.updateWidget(event, gameState);
+            thegreatReset();
+        }
+        else if(gameState == STATE_SETTINGS){
+            settingsMenu.updateWidget(event, gameState);
+            if(gameState == STATE_MENU || gameState == STATE_PAUSE){
+                gameState = prevState;
             }
         }
+        else if(gameState == STATE_PAUSE){
+            pauseMenu.updateWidget(event, gameState);
+            if(gameState == STATE_GAME){
+                pauseGame = false;
+            }
+        }
+        else if(gameState == STATE_WIN){
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN){
+                gameState = STATE_MENU;
+            }
+        }
+        else if(gameState == STATE_GAME) {
+            if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                pauseGame = !pauseGame;  
+                gameState = STATE_PAUSE;
+                
+                if(pauseGame && player){
+                    player->stopMovement();
+                }
+            }
 
-        if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_r){
-            if(player){
-                player->reset(false, levelManager->getCurrentLevel());
+            if (!pauseGame && player) { 
+                player->handleEvent(event, pauseGame);
             }
+
+            if (dialogue.isActive()) {
+                if (event.type == SDL_KEYDOWN) {
+                    if (event.key.keysym.sym == SDLK_z) {
+                        dialogue.skipOrNext();
+                    } else {
+                        dialogue.handleKey(event.key.keysym.sym);
+                    }
+                }
+            }
+            
         }
-        if (!pauseGame && player) { 
-            player->handleEvent(event, pauseGame);
+        else if(gameState == STATE_DEAD){
+            Uint32 timeofDeath = SDL_GetTicks() - deathTimer;
+            if(timeofDeath >= 1000){
+                waitKey = true;
+            }
+            if(waitKey && event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_RETURN){
+                gameState = STATE_MENU;
+            }
+            player->reset(0);
+        }
+        if (gameState == STATE_END) {
+            quit = true;
         }
     }
 }
 
 void Game::update(float deltaTime) {
-    if(pauseGame) return;
-    bool isVertical = levelManager->isSpecialLevel();
-
-    // Get display size
-    SDL_DisplayMode DM;
-    SDL_GetCurrentDisplayMode(0, &DM);
-    int screenWidth = DM.w;
-    int screenHeight = DM.h;
-
-    int newWidth, newHeight;
-
-    if (isVertical) {
-        newWidth = SCREEN_HEIGHT;
-        newHeight = SCREEN_WIDTH;
-    } else {
-        newWidth = SCREEN_WIDTH;
-        newHeight = SCREEN_HEIGHT;
+    if(gameState == STATE_MENU){
+        menu.updateBackground(deltaTime);
     }
-
-    // Resize the window
-    SDL_SetWindowSize(gWindow, newWidth, newHeight);
-
-    // Center the window
-    int newX = (screenWidth - newWidth) / 2;
-    int newY = (screenHeight - newHeight) / 2;
-    SDL_SetWindowPosition(gWindow, newX, newY);
-
-    // Update the player
-    player->update(deltaTime, pauseGame);
-    player->updateAnimation(deltaTime);
-    levelManager->updateCheckpoint(deltaTime, *player);
-
-    // Handle level transition
-    if (player->reachedExit()) {
-        levelManager->fade(gRenderer, 500, false);
-        levelManager->NextLevel();
-        player->reset(true, levelManager->getCurrentLevel());
+    else if(gameState == STATE_SETTINGS){
+        settingsMenu.updateBackground(deltaTime);
     }
+    else if(gameState == STATE_PAUSE){
+        pauseMenu.updateBackground(deltaTime);
+        if (gameState == STATE_GAME) {
+            pauseGame = false;
+        }
+    }
+    else if(gameState == STATE_GAME) {
+        if(pauseGame) return;
 
-    // Update background offsets
-    offset1 -= baseSpeed * 0.2f * deltaTime;
-    offset2 -= baseSpeed * 0.5f * deltaTime;
-    offset3 -= baseSpeed * 1.0f * deltaTime;
-    offset4 -= baseSpeed * 1.2f * deltaTime;
+        std::vector<std::vector<int>> path = seeker->loadCSV(levelManager->getLevelCSV());
+        if(!dialogue.isActive()){
+            player->update(deltaTime, pauseGame, levelManager->isSpecialLevel(), levelManager->GetLevelData(), levelManager->getCurrentLevel());
+            seeker->update(deltaTime, path, player->getRect(), levelManager->getCurrentLevel());
+            player->updateAnimation(deltaTime);
+        }
+        if (!hasTrigger) {
+            SDL_Rect playerRect = player->getRect();
+            int tileX = playerRect.x / TILE_SIZE;
+            int tileY = playerRect.y / TILE_SIZE;
 
-    if (offset1 <= -newWidth) offset1 = 0;
-    if (offset2 <= -newWidth) offset2 = 0;
-    if (offset3 <= -newWidth) offset3 = 0;
-    if (offset4 <= -newWidth) offset4 = 0;
+            std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
+
+            if (tileY >= 0 && tileY < grid.size() &&
+                tileX >= 0 && tileX < grid[0].size()) {
+
+                int tileType = grid[tileY][tileX].type;
+
+                if (tileType == DIALOGUE_TRIGGER_ANOTHER && !hasFirstDialogue) {
+                    hasFirstDialogue = true;
+                    dialogue.trigger({
+                        "Greetings, today is such a lovely day!",
+                        "BTW, you can press Z to skip what I'll say",
+                        "Bach is the creator of me, he wants to tell you something",
+                        "There are 2 modes: flashlight and no flashlight",
+                        "What do you want?",
+                        "Okay now have fun"
+                    }, true);
+                }
+                
+                int temp_level = levelManager->getCurrentLevel();
+                if (tileType == DIALOGUE_TRIGGER && !hasSecondDialogue && temp_level != 0) {
+                    hasSecondDialogue = true;
+                    dialogue.trigger({
+                        "Did you have fun ?",
+                        "Well, hope you did because this is the end of the game",
+                        "See you again..."
+                    }, false);
+                }
+                if(tileType == 513){
+                    gameState = STATE_WIN;
+                }
+            }
+        }
+        dialogue.update(deltaTime);
+
+        if (player->reachedExit(levelManager->isSpecialLevel(), levelManager->getCurrentLevel())) {
+            levelManager->NextLevel();
+            player->reset(levelManager->getCurrentLevel());
+            seeker->respawn();
+        }
+
+        if(player->isDead(levelManager->getCurrentLevel())){ 
+            gameState = STATE_DEAD;
+            deathTimer = SDL_GetTicks();
+            waitKey = false;
+        }
+
+        if(seeker->seekerCollidePlayer(player->getRect())){
+            gameState = STATE_DEAD;
+        }
+    }
 }
-
 
 void Game::render() {
     SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
     SDL_RenderClear(gRenderer);
     if(gameState == STATE_MENU){
+        SDL_Rect screen = {SCREEN_WIDTH / 2 - 90, SCREEN_HEIGHT / 2 - 180, 180, 64};
         menu.renderBackground(gRenderer);
-        //return; not yet 
+        levelManager->renderText("MOONLIGHT", font, screen, {0,0,139, 180});
+        menu.button_render(gRenderer, font);
+        return;
     }
+    else if(gameState == STATE_SETTINGS){
+        settingsMenu.renderBackground(gRenderer);
+        settingsMenu.button_render(gRenderer, font);
+        return;
+    }
+    else if(gameState == STATE_PAUSE){
+        pauseMenu.renderBackground(gRenderer);
+        pauseMenu.button_render(gRenderer, font);
+        return;
+    }
+    else if (gameState == STATE_DEAD) {        
+        std::string message = waitKey ? "You Died! Press Enter to return to menu." : "You Died...";
+        int screenH, screenW;
+        if(levelManager->isSpecialLevel()){
+            screenW = PORTRAIT_WIDTH;
+            screenH = PORTRAIT_HEIGHT;
+        }
+        else{
+            screenW = LANDSCAPE_WIDTH;
+            screenH = LANDSCAPE_HEIGHT;
+        }
+        SDL_Rect screen = {0,0, screenW + 300, screenH};
+        levelManager->renderText(message, font ,screen, {0,0,0,180});
+    }
+    else if(gameState == STATE_WIN){
+        SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
+        SDL_RenderClear(gRenderer);
+    
+        SDL_Rect titleRect = {SCREEN_WIDTH / 2 - 160, SCREEN_HEIGHT / 2 - 35, 288, 64};
+        SDL_Rect messageRect = {SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 2 + 35, 300, 64};
+    
+        levelManager->renderText("YOU WIN!", font, titleRect, {0, 0, 139, 255}); 
+        levelManager->renderText("Press Enter to return.", font, messageRect, {0, 0, 139, 255});
+    }
+    else if(gameState == STATE_GAME) {
+        float playerX = player->getX();
+        int levelNum = levelManager->getCurrentLevel();
 
-    bool isVertical = levelManager->isSpecialLevel();
+        if(levelNum != 4){
+            static float farX = 0.0f;
+            static float midX = 0.0f;
+            farX -= 0.5f;
+            midX -= 0.8f;
 
-    /*if (!isVertical) {
-        // Horizontal scrolling (X-axis)
-        renderBackground(gRenderer, gLayer1, offset1, 0, false);
-        renderBackground(gRenderer, gLayer2, offset2, 0, false);
-        renderBackground(gRenderer, gLayer3, offset3, 0, false);
-        renderBackground(gRenderer, gLayer4, offset4, 0, false);
-    } else {
-        // Vertical scrolling (Y-axis)
-        renderBackground(gRenderer, gLayer1, 0, offset1, true);
-        renderBackground(gRenderer, gLayer2, 0, offset2, true);
-        renderBackground(gRenderer, gLayer3, 0, offset3, true);
-        renderBackground(gRenderer, gLayer4, 0, offset4, true);
-    }*/
+            if(farX <= -SCREEN_WIDTH) farX += SCREEN_WIDTH;
+            if(midX <= -SCREEN_WIDTH) midX += SCREEN_WIDTH;
 
-    // Render the tile map and player
-    std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
-    for (int y = 0; y < grid.size(); y++) {
-        for (int x = 0; x < grid[y].size(); x++) {
-            SDL_Texture* tileTex = levelManager->GetTexture(grid[y][x].type);
-            if (tileTex) {
-                SDL_Rect dstRect;
-                if (!isVertical) {
-                    dstRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
-                } else {
-                    dstRect = { 
-                        static_cast<int>(x * TILE_SIZE), 
-                        static_cast<int>((static_cast<int>(grid.size()) - y - 1) * TILE_SIZE), 
-                        TILE_SIZE, 
-                        TILE_SIZE 
-                    };
-                    
-                }
-                SDL_RenderCopy(gRenderer, tileTex, nullptr, &dstRect);
+            int mid_nearX = static_cast<int>(-playerX * 0.34f);
+            int nearX = static_cast<int>(-playerX * 0.7f);
+
+            SDL_Rect dest = {0,0, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT};
+            for (int i = -1; i <= 1; ++i) {
+                dest.x = static_cast<int>(farX + i * SCREEN_WIDTH);
+                SDL_RenderCopy(gRenderer, far, nullptr, &dest);
+            }
+        
+            for (int i = -1; i <= 1; ++i) {
+                dest.x = static_cast<int>(midX + i * SCREEN_WIDTH);
+                SDL_RenderCopy(gRenderer, mid, nullptr, &dest);
+            }
+        
+            for (int i = -1; i <= 1; ++i) {
+                dest.x = mid_nearX + i * SCREEN_WIDTH;
+                SDL_RenderCopy(gRenderer, mid_near, nullptr, &dest);
+            }
+        
+            for (int i = -1; i <= 1; ++i) {
+                dest.x = nearX + i * SCREEN_WIDTH;
+                SDL_RenderCopy(gRenderer, near, nullptr, &dest);
             }
         }
-    }
-    // render checkpoints
-    levelManager->renderCheckpoint(gRenderer);
-    // Render the player
-    player->render(gRenderer);
-}
+        
+        std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
+        for (int y = 0; y < grid.size(); y++) {
+            for (int x = 0; x < grid[y].size(); x++) {
+                SDL_Texture* tileTex = levelManager->GetTexture(grid[y][x].type);
+                if (tileTex) {
+                    SDL_Rect dstRect = { x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+                    SDL_RenderCopy(gRenderer, tileTex, nullptr, &dstRect);
+                }
+            }
+        }
+        
+        player->render(gRenderer);
+        seeker->render(gRenderer, player->getRect(), levelManager->getCurrentLevel());
 
+        if(levelManager->isSpecialLevel()){
+            SDL_Rect scoreBox = {PORTRAIT_WIDTH - 20, PORTRAIT_HEIGHT - 20, 20, 20};
+            levelManager->renderText(seeker->getScore(), font, scoreBox, {0,0,0, 200});
+        }
+        else{
+            SDL_Rect scoreBox = {LANDSCAPE_WIDTH - 100, LANDSCAPE_HEIGHT - 100, 80, 80};
+            levelManager->renderText(seeker->getScore(), font, scoreBox, {0,0,0, 200});
+        }
+        
+        if(dialogue.isModeEnabled()){
+            int lightX = player->getX() + PLAYER_WIDTH / 2;
+            int lightY = player->getY() + PLAYER_HEIGHT / 2;
+            int lightRadius = 150;  
+            
+            player->flashLight(gRenderer, lightX, lightY, lightRadius, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, true);
+        }
+
+        dialogue.render(gRenderer, font);
+    }
+}
 
 void Game::controlFrameRate(Uint32 frameStart, int frameDelay) {
     int frameTime = SDL_GetTicks() - frameStart;
@@ -254,12 +411,13 @@ void Game::controlFrameRate(Uint32 frameStart, int frameDelay) {
     }
 }
 
-
 void Game::run() {
     const int FRAME_DELAY = 1000 / 60; // 60 FPS
     Uint32 lastTime = SDL_GetTicks();
     levelManager->LoadLevel();
-    levelManager->loadCheckPoint(levelManager->getCurrentLevel());
+    if(music){
+        Mix_PlayMusic(music, -1);
+    }
 
     while (!quit) {
         input();  
@@ -267,52 +425,72 @@ void Game::run() {
         Uint32 currentTime = SDL_GetTicks();
         float deltaTime = (currentTime - lastTime) / 1000.0f;
         lastTime = currentTime;
-
-        if (!pauseGame) {
+    
+        if (gameState == STATE_MENU || gameState == STATE_GAME || gameState == STATE_SETTINGS || gameState == STATE_DEAD) {
             update(deltaTime);  
             render();           
         }
-        else {
-            renderPauseMenu(gRenderer);
+        else if (gameState == STATE_PAUSE) {
+            pauseMenu.updateBackground(deltaTime);
+            pauseMenu.renderBackground(gRenderer);
+            pauseMenu.button_render(gRenderer, font);
         }
+    
         controlFrameRate(frameStart, FRAME_DELAY);
         SDL_RenderPresent(gRenderer);
     }
 }
 
-
-void Game::renderBackground(SDL_Renderer* renderer, SDL_Texture* gLayerX, float offsetX, float offsetY, bool isVertical){
-    if (gLayerX != nullptr) {
-        SDL_Rect bgRect1, bgRect2;
-
-        if (!isVertical) {
-            // Standard horizontal scrolling
-            bgRect1 = { static_cast<int>(offsetX), 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-            bgRect2 = { static_cast<int>(offsetX + SCREEN_WIDTH), 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-        } else {
-            // Vertical scrolling
-            bgRect1 = { 0, static_cast<int>(offsetY), SCREEN_WIDTH, SCREEN_HEIGHT };
-            bgRect2 = { 0, static_cast<int>(offsetY + SCREEN_HEIGHT), SCREEN_WIDTH, SCREEN_HEIGHT };
-        }
-
-        SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect1);
-        SDL_RenderCopy(renderer, gLayerX, NULL, &bgRect2);
+void Game::thegreatReset(){
+    if (player) {
+        player->reset(0);  
     }
+
+    if (seeker) {
+        seeker->respawn(); 
+        seeker->spawnCoin(5);
+    }
+
+    if (levelManager) {
+        levelManager->reset();  
+    }
+
+    dialogue.setMode(false);
+
+    hasFirstDialogue = false;
+    hasSecondDialogue = false;
+    hasTrigger = false;
+
+    pauseGame = false;
+    waitKey = false;
 }
 
 void Game::close() {
-
-    SDL_DestroyTexture(gLayer1);
-    SDL_DestroyTexture(gLayer2);
-    SDL_DestroyTexture(gLayer3);
-    SDL_DestroyTexture(gLayer4);
-    gLayer1 = gLayer2 = gLayer3 = gLayer4 = nullptr;
-    
     if (player) {
         delete player;
         player = nullptr;
     }
-    //Tile::cleanUp();
+
+    if(seeker){
+        delete seeker;
+        seeker = nullptr;
+    }
+
+    if(levelManager){
+        delete levelManager;
+        levelManager = nullptr;
+    }
+
+    if (font) {
+        TTF_CloseFont(font);
+        font = nullptr;
+    }
+
+    SDL_DestroyTexture(far);
+    SDL_DestroyTexture(mid);
+    SDL_DestroyTexture(mid_near);
+    SDL_DestroyTexture(near);
+
     SDL_DestroyRenderer(gRenderer);
     SDL_DestroyWindow(gWindow);
     gRenderer = nullptr;
@@ -320,16 +498,6 @@ void Game::close() {
     
     IMG_Quit();
     SDL_Quit();
-}
-
-void Game::renderPauseMenu(SDL_Renderer* renderer){
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderClear(renderer);
-    SDL_Rect overlay = {0,0,SCREEN_WIDTH, SCREEN_HEIGHT};
-    SDL_RenderFillRect(renderer, &overlay);
-
-    SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-    SDL_Rect pauseBox = {SCREEN_WIDTH / 4, SCREEN_HEIGHT / 4, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2};
-    SDL_RenderFillRect(renderer, &pauseBox);
-
+    TTF_Quit();
+    Mix_Quit();
 }
