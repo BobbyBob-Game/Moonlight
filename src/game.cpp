@@ -393,11 +393,17 @@ void Game::render() {
         }
         
         if(dialogue.isModeEnabled()){
-            int lightX = player->getX() + PLAYER_WIDTH / 2;
-            int lightY = player->getY() + PLAYER_HEIGHT / 2;
+            int lightX = player->getX() + PLAYER_WIDTH / 3;
+            int lightY = player->getY() + PLAYER_HEIGHT / 3;
             int lightRadius = 150;  
+            if(!levelManager->isSpecialLevel()){
+                player->flashLight(gRenderer, lightX, lightY, lightRadius, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, true);
+            }
+            else{
+                player->flashLight(gRenderer, lightX, lightY, lightRadius, LANDSCAPE_HEIGHT, LANDSCAPE_WIDTH, true);
+            }
             
-            player->flashLight(gRenderer, lightX, lightY, lightRadius, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT, true);
+            
         }
 
         dialogue.render(gRenderer, font);
