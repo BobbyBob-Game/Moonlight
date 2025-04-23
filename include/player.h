@@ -43,6 +43,9 @@ private:
     float jumpHoldTIme = 0.0f;
     bool jumpHold = false;
 
+    float coyoteTimer = 0.0f;
+    const float coyoteTime = 0.1f; 
+
     float posX;
     float posY;
     float velX;

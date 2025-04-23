@@ -231,8 +231,8 @@ void Game::update(float deltaTime) {
         }
         if (!hasTrigger) {
             SDL_Rect playerRect = player->getRect();
-            int tileX = playerRect.x / TILE_SIZE;
-            int tileY = playerRect.y / TILE_SIZE;
+            int tileX = (playerRect.x + playerRect.w / 2) / TILE_SIZE;
+            int tileY = (playerRect.y + playerRect.h / 2) / TILE_SIZE;
 
             std::vector<std::vector<Tile>> grid = levelManager->GetLevelData();
 
@@ -254,6 +254,7 @@ void Game::update(float deltaTime) {
                 }
                 
                 int temp_level = levelManager->getCurrentLevel();
+                
                 if (tileType == DIALOGUE_TRIGGER && !hasSecondDialogue && temp_level != 0) {
                     hasSecondDialogue = true;
                     dialogue.trigger({
@@ -262,9 +263,10 @@ void Game::update(float deltaTime) {
                         "See you again..."
                     }, false);
                 }
-                if(tileType == 513){
+                if(tileType == 513 && temp_level == 5){
                     gameState = STATE_WIN;
                 }
+                std::cout << "TileType: " << tileType << ", Level: " << temp_level << std::endl;
             }
         }
         dialogue.update(deltaTime);
@@ -281,9 +283,9 @@ void Game::update(float deltaTime) {
             waitKey = false;
         }
 
-        if(seeker->seekerCollidePlayer(player->getRect())){
+        /*if(seeker->seekerCollidePlayer(player->getRect())){
             gameState = STATE_DEAD;
-        }
+        }*/
     }
 }
 
@@ -322,14 +324,33 @@ void Game::render() {
         levelManager->renderText(message, font ,screen, {0,0,0,180});
     }
     else if(gameState == STATE_WIN){
-        SDL_SetRenderDrawColor(gRenderer, 0, 0, 0, 255);
-        SDL_RenderClear(gRenderer);
-    
-        SDL_Rect titleRect = {SCREEN_WIDTH / 2 - 160, SCREEN_HEIGHT / 2 - 35, 288, 64};
-        SDL_Rect messageRect = {SCREEN_WIDTH / 2 - 150, SCREEN_HEIGHT / 2 + 35, 300, 64};
-    
-        levelManager->renderText("YOU WIN!", font, titleRect, {0, 0, 139, 255}); 
-        levelManager->renderText("Press Enter to return.", font, messageRect, {0, 0, 139, 255});
+        std::vector<std::string> creditsV = {
+            "A long time ago, in a galaxy far,",
+            "far away....",
+            "",
+            "MOONLIGHT",
+            " ",
+            "Lead Developer: Bach",
+            "Graphics: You",
+            "Music: Composer Name",
+            "Special Thanks: Player",
+            "",
+            "THE END"
+        };  
+        CreditRenderer credits(gRenderer, font, SCREEN_WIDTH, SCREEN_HEIGHT);
+        credits.start(creditsV);
+        
+        Uint32 last = SDL_GetTicks();
+        bool runningCredits = true;
+        while (runningCredits) {
+            Uint32 now = SDL_GetTicks();
+            float dt = (now - last) / 1000.0f;
+            last = now;
+
+            runningCredits = credits.updateAndRender(dt);
+            SDL_Delay(16);
+        }
+        gameState = STATE_MENU;
     }
     else if(gameState == STATE_GAME) {
         float playerX = player->getX();

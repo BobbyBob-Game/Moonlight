@@ -73,7 +73,7 @@ void Player::handleEvent(const SDL_Event& e, bool pauseGame) {
                 break;
 
                 case SDLK_SPACE:
-                    if (!isJumping && !isFalling) { 
+                    if (coyoteTimer <= coyoteTime) { 
                         velY = jumpStrength;
                         isJumping = true;
                         isFalling = false;
@@ -168,6 +168,17 @@ void Player::update(float deltaTime, bool pauseGame, bool special, const std::ve
 
     if (velY > maxFallSpeed) velY = maxFallSpeed;
 
+    SDL_Rect feet = {
+        int(posX), int(posY) + collisionHeight + 1,
+        collisionWidth, 1
+    };
+
+    bool onGround = checkTileCollision(feet, levelData, currentLevel);
+    if (onGround) coyoteTimer = 0.0f;
+    else          coyoteTimer += deltaTime;
+    std::cout << "coyoteTimer: " << coyoteTimer << "\n";
+
+
     // Horizontal movement + collision
     float nextPosX = posX + velX * deltaTime * 200.0f;
     SDL_Rect futureXRect = { static_cast<int>(nextPosX), static_cast<int>(posY), collisionWidth, collisionHeight };
@@ -192,6 +203,11 @@ void Player::update(float deltaTime, bool pauseGame, bool special, const std::ve
     }
 
     if (posX < 0) posX = 0;
+    if(currentLevel == 5){
+        if (posX > SCREEN_WIDTH - collisionWidth) {
+            posX = SCREEN_WIDTH - collisionWidth;
+        }
+    }
 
     if (special) {
         if (posY < 0) {

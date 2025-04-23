@@ -7,6 +7,7 @@
 #include "widget.h"
 #include "seeker.h"
 #include "dialogue.h"
+#include "ending.h"
 
 class Game {
 public:

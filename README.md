@@ -57,7 +57,9 @@ Check list:
 
 --MORE--
 -
-- SDL_Vertex for rendering triangle
+- Flash light mechanics
+- Coyotte jump time (classic game mechanic)
+- Star war-styled ending
 - Mode selection through dialogue
 - Dialogue options
 - Smooth animation for actions
