@@ -283,9 +283,9 @@ void Game::update(float deltaTime) {
             waitKey = false;
         }
 
-        /*if(seeker->seekerCollidePlayer(player->getRect())){
+        if(seeker->seekerCollidePlayer(player->getRect())){
             gameState = STATE_DEAD;
-        }*/
+        }
     }
 }
 

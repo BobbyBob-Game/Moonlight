@@ -34,8 +34,8 @@ static const int wallJumpStrengthY = -12;
 static const float maxFallSpeed = 8.0f;
 static const int TOTAL_LEVELS = 5;
 
-const int DIALOGUE_TRIGGER = 279;
-const int DIALOGUE_TRIGGER_ANOTHER = 278;
+const int DIALOGUE_TRIGGER = 310;
+const int DIALOGUE_TRIGGER_ANOTHER = 311;
 const int SUBPIXELS_PER_PIXEL = 8;
 const float MAX_SPEED = 0.35f * SUBPIXELS_PER_PIXEL;         // 96 subpixels
 const float GRAVITY = 15.0f;
